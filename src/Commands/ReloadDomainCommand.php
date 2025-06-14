@@ -3,6 +3,7 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Oor;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -30,6 +31,13 @@ class ReloadDomainCommand extends Command
      */
     protected $signature = 'orchestra:reload {name?}';
 
+    /**
+     * Handle the command.
+     *
+     * @return int
+     *
+     * @throws \Exception
+     */
     public function handle(): int
     {
         try {
@@ -37,9 +45,12 @@ class ReloadDomainCommand extends Command
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

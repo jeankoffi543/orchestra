@@ -3,6 +3,7 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -30,13 +31,20 @@ class UnlinkTenantCommand extends Command
      */
     protected $signature = 'orchestra:unlink {tenant}';
 
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     *
+     * @throws \Exception
+     */
     public function handle(): int
     {
         try {
             // Récupérer les arguments et options correctement
             $tenant = $this->argument('tenant'); // par exemple
 
-            $unlink = \public_path("storage/tenants/{$tenant}");
+            $unlink = public_path("storage/tenants/{$tenant}");
 
             if (File::exists($unlink)) {
                 \unlink($unlink);
@@ -45,9 +53,12 @@ class UnlinkTenantCommand extends Command
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -10,14 +10,21 @@ class AddAutoloadNamespaceCommand extends Command
     protected $signature   = 'orchestra:autoload:add {tenant}';
     protected $description = 'Ajoute les namespaces PSR-4 du tenant au composer.json du projet';
 
+    /**
+     * Handle the command.
+     *
+     * @return int
+     *
+     * @throws \Exception
+     */
     public function handle(): int
     {
         try {
             $tenant       = $this->argument('tenant');
-            $composerPath = \base_path('composer.json');
+            $composerPath = base_path('composer.json');
 
             if (!\file_exists($composerPath)) {
-                \runInConsole(fn () => $this->error('composer.json introuvable.'));
+                runInConsole(fn () => $this->error('composer.json introuvable.'));
                 throw new \Exception('composer.json introuvable.', Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
@@ -37,9 +44,9 @@ class AddAutoloadNamespaceCommand extends Command
             foreach ($autoloads as $ns => $path) {
                 if (!isset($json['autoload']['psr-4'][$ns])) {
                     $json['autoload']['psr-4'][$ns] = $path;
-                    \runInConsole(fn () => $this->info("Ajouté: $ns → $path"));
+                    runInConsole(fn () => $this->info("Ajouté: $ns → $path"));
                 } else {
-                    \runInConsole(fn () => $this->line("Déjà présent: $ns"));
+                    runInConsole(fn () => $this->line("Déjà présent: $ns"));
                 }
             }
 
@@ -49,11 +56,15 @@ class AddAutoloadNamespaceCommand extends Command
             // Dump autoload pour prise en compte
             \exec('composer dump-autoload');
 
-            \runInConsole(fn () => $this->info('composer.json mis à jour avec succès et autoload régénéré.'));
+            runInConsole(fn () => $this->info('composer.json mis à jour avec succès et autoload régénéré.'));
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
+
+                return Command::FAILURE;
+            });
             throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

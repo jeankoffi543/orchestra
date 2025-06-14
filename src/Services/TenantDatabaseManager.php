@@ -20,12 +20,22 @@ class TenantDatabaseManager
     private static string $mainPassword;
     private static ?string $tenantName = '';
 
+    /**
+     * Connect to the database manager.
+     *
+     * @param string|null $driver The database driver to use. Supported drivers are 'pgsql', 'mysql', and 'sqlite'.
+     * @param string|null $tenantName The name of the tenant to connect to.
+     *
+     * @throws \Exception If an unsupported driver is given.
+     *
+     * @return void
+     */
     public static function connect(?string $driver = 'pgsql', ?string $tenantName = ''): void
     {
         self::$driver       = $driver;
         self::$tenantName   = $tenantName;
-        self::$mainUserName = \config('database.connections.pgsql.username');
-        self::$mainPassword = \config('database.connections.pgsql.password');
+        self::$mainUserName = config('database.connections.pgsql.username');
+        self::$mainPassword = config('database.connections.pgsql.password');
 
         switch ($driver) {
             case 'pgsql':
@@ -52,6 +62,16 @@ class TenantDatabaseManager
         }
     }
 
+    /**
+     * Create a database user.
+     *
+     * @param string $username The username to create.
+     * @param string $password The password for the new user.
+     *
+     * @return void
+     *
+     * @throws \Exception If the user already exists or if there is a problem while creating the user.
+     */
     public static function createUser(string $username, string $password): void
     {
         $Validator = Validator::make(
@@ -86,6 +106,16 @@ class TenantDatabaseManager
         }
     }
 
+    /**
+     * Create a database for a tenant.
+     *
+     * @param string $dbname The name of the database to create.
+     * @param string $owner The owner of the database.
+     *
+     * @return void
+     *
+     * @throws \Exception If an error occurs while creating the database.
+     */
     public static function createDatabase(string $dbname, string $owner): void
     {
         $tenantName = self::$tenantName;
@@ -106,7 +136,7 @@ class TenantDatabaseManager
             }
 
             if (self::$driver === 'sqlite') {
-                $path = \base_path("site/$tenantName/database.sqlite");
+                $path = base_path("site/$tenantName/database.sqlite");
                 \touch($path);
 
                 return;
@@ -124,6 +154,14 @@ class TenantDatabaseManager
         }
     }
 
+    /**
+     * Grant all privileges to a user on a database.
+     *
+     * @param string $dbname The name of the database to grant privileges on.
+     * @param string $username The username to grant privileges to.
+     *
+     * @return void
+     */
     public static function grantPrivileges(string $dbname, string $username): void
     {
         $Validator = Validator::make(
@@ -152,6 +190,13 @@ class TenantDatabaseManager
         self::$pdo->exec($sql);
     }
 
+    /**
+     * Drop a tenant database.
+     *
+     * @param string $dbname The name of the database to drop.
+     *
+     * @return void
+     */
     public static function dropTenantDatabase(string $dbname): void
     {
         $tenantName = self::$tenantName;
@@ -170,7 +215,7 @@ class TenantDatabaseManager
         }
 
         if (self::$driver === 'sqlite') {
-            $path = \base_path("site/$tenantName/database.sqlite");
+            $path = base_path("site/$tenantName/database.sqlite");
             if (\file_exists($path)) {
                 \unlink($path);
             }
@@ -185,6 +230,13 @@ class TenantDatabaseManager
         self::$pdo->exec($sql);
     }
 
+    /**
+     * Drop a database user.
+     *
+     * @param string $username The username to drop.
+     *
+     * @return void
+     */
     public static function dropUser(string $username): void
     {
         $Validator = Validator::make(
@@ -212,6 +264,17 @@ class TenantDatabaseManager
         self::$pdo->exec($sql);
     }
 
+    /**
+     * Creates a new tenant with the given database name, username and password.
+     *
+     * This function will create a new database user, a new database and grant the user all privileges on the database.
+     *
+     * @param string $dbname The name of the database to create.
+     * @param string $username The username for the new user.
+     * @param string $password The password for the new user.
+     *
+     * @return void
+     */
     public static function createTenant(string $dbname, string $username, string $password): void
     {
         self::createUser($username, $password);
@@ -250,6 +313,13 @@ class TenantDatabaseManager
         };
     }
 
+    /**
+     * Check if a database with the given name exists.
+     *
+     * @param string $name The name of the database to check.
+     *
+     * @return bool True if the database exists, false otherwise.
+     */
     public static function databaseExists(string $name): bool
     {
         $driver = self::$driver;
@@ -257,11 +327,18 @@ class TenantDatabaseManager
         return match ($driver) {
             'pgsql'  => (bool) self::$pdo->query("SELECT 1 FROM pg_database WHERE datname = '{$name}'")->fetch(),
             'mysql'  => (bool) self::$pdo->query("SHOW DATABASES LIKE '{$name}'")->fetch(),
-            'sqlite' => \file_exists(\database_path("{$name}.sqlite")),
+            'sqlite' => \file_exists(database_path("{$name}.sqlite")),
             default  => throw new \RuntimeException("Unsupported driver: {$driver}"),
         };
     }
 
+    /**
+     * Check if a user with the given name exists.
+     *
+     * @param string $username The name of the user to check.
+     *
+     * @return bool True if the user exists, false otherwise.
+     */
     public static function userExists(string $username): bool
     {
         $driver = self::$driver;
@@ -274,11 +351,21 @@ class TenantDatabaseManager
         };
     }
 
+    /**
+     * Dump the database of the given tenant to a file.
+     *
+     * @param string $tenantEnvPath The path to the tenant's .env file.
+     * @param string $destination The path where the dump will be saved.
+     * @param OutputStyle|null $console The console output (default is null).
+     * @param string|null $driver The database driver to use (default is null).
+     *
+     * @throws Exception If there is a problem while dumping the database.
+     */
     public static function dump(string $tenantEnvPath, string $destination, ?OutputStyle $console, ?string $driver = null): void
     {
         // 3. Charger l'env du tenant
-        $envPath       = \checkFileExists("{$tenantEnvPath}/.env");
-        $masterEnvPath = \checkFileExists(\base_path('.env'));
+        $envPath       = checkFileExists("{$tenantEnvPath}/.env");
+        $masterEnvPath = checkFileExists(base_path('.env'));
 
         $env       = \parse_ini_file($envPath);
         $masterEnv = \parse_ini_file($masterEnvPath);
@@ -291,42 +378,52 @@ class TenantDatabaseManager
             throw new Exception("DB_DATABASE, DB_USERNAME ou DB_PASSWORD manquant dans l'env");
         }
 
-        $driver = $driver ?? \getDriver($masterEnv);
+        $driver = $driver ?? getDriver($masterEnv);
 
         // 4. Dump de la base de données
         $dumpPath = "{$destination}/{$dbName}.sql";
         if ($driver === 'pgsql') {
             $cmd = \sprintf(
                 'PGPASSWORD=%s pg_dump -U %s -h 127.0.0.1 -F p %s > %s',
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($user, ShellContextEnum::ARG()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
-                \safeShell($dumpPath, ShellContextEnum::FILE()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($user, ShellContextEnum::ARG()),
+                safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($dumpPath, ShellContextEnum::FILE()),
             );
         } elseif ($driver === 'mysql') {
             $cmd = \sprintf(
                 'mysqldump -u%s -p%s %s > %s',
-                \safeShell($user, ShellContextEnum::ENV()),
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
-                \safeShell($dumpPath, ShellContextEnum::FILE()),
+                safeShell($user, ShellContextEnum::ENV()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($dumpPath, ShellContextEnum::FILE()),
             );
         } else {
             throw new Exception("Driver non supporté : $driver");
         }
 
         \exec($cmd, $output, $exitCode);
-        \runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
+        runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
         if ($exitCode !== 0) {
-            \runInConsole(fn () => $console?->writeln("<error>Échec du dump de la base de données pour $dbName. Vérifiez vos informations de connexion ou soit la base de donnée n'existe pas</error>"));
+            runInConsole(fn () => $console?->writeln("<error>Échec du dump de la base de données pour $dbName. Vérifiez vos informations de connexion ou soit la base de donnée n'existe pas</error>"));
         }
     }
 
+    /**
+     * Import a database dump into the tenant's database.
+     *
+     * @param string $tenantEnvPath The path to the tenant's .env file.
+     * @param string $extractPath The path where the dump was extracted.
+     * @param OutputStyle|null $console The console output (default is null).
+     * @param string|null $driver The database driver to use (default is null).
+     *
+     * @throws Exception If there is a problem while importing the database.
+     */
     public static function import(string $tenantEnvPath, string $extractPath, ?OutputStyle $console, ?string $driver = null): void
     {
         // 3. Charger l'env du tenant
-        $envPath       = \checkFileExists("{$tenantEnvPath}");
-        $masterEnvPath = \checkFileExists(\base_path('.env'));
+        $envPath       = checkFileExists("{$tenantEnvPath}");
+        $masterEnvPath = checkFileExists(base_path('.env'));
 
         $env       = \parse_ini_file($envPath);
         $masterEnv = \parse_ini_file($masterEnvPath);
@@ -336,15 +433,15 @@ class TenantDatabaseManager
         $pass   = $masterEnv['DB_PASSWORD'] ?? null; //global user with necessaries permissions
 
         if (!$dbName || !$user || !$pass) {
-            \runInConsole(fn () => $console?->writeln('<error>Erreur lors de l’import de la base de données </error>'));
+            runInConsole(fn () => $console?->writeln('<error>Erreur lors de l’import de la base de données </error>'));
 
             return;
         }
 
-        $driver = $driver ?? \getDriver($masterEnv);
+        $driver = $driver ?? getDriver($masterEnv);
 
         // 4. Restaurer la base de données
-        $sqlFile = \checkFileExists("$extractPath/{$dbName}.sql");
+        $sqlFile = checkFileExists("$extractPath/{$dbName}.sql");
 
         // Suppression de la ligne SET transaction_timeout
         $content = \file_get_contents($sqlFile);
@@ -355,40 +452,40 @@ class TenantDatabaseManager
             // Création de la DB (si elle n'existe pas)
             $createDbCmd = \sprintf(
                 'PGPASSWORD=%s createdb -U %s -h 127.0.0.1 %s',
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($user, ShellContextEnum::ARG()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($user, ShellContextEnum::ARG()),
+                safeShell($dbName, ShellContextEnum::ARG()),
             );
 
             \exec($createDbCmd, $output, $exitCode);
-            \runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
+            runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
 
             // Import
             $importCmd = \sprintf(
                 'PGPASSWORD=%s psql -U %s -h 127.0.0.1 -d %s -f %s',
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($user, ShellContextEnum::ARG()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
-                \safeShell($sqlFile, ShellContextEnum::FILE()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($user, ShellContextEnum::ARG()),
+                safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($sqlFile, ShellContextEnum::FILE()),
             );
         } elseif ($driver === 'mysql') {
             $createDbCmd = \sprintf(
                 'mysql -u%s -p%s -e "CREATE DATABASE IF NOT EXISTS %s"',
-                \safeShell($user, ShellContextEnum::ARG()),
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($user, ShellContextEnum::ARG()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($dbName, ShellContextEnum::ARG()),
             );
 
             \exec($createDbCmd, $output, $exitCode);
-            \runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
+            runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
 
 
             $importCmd = \sprintf(
                 'mysql -u%s -p%s %s < %s',
-                \safeShell($user, ShellContextEnum::ARG()),
-                \safeShell($pass, ShellContextEnum::ENV()),
-                \safeShell($dbName, ShellContextEnum::ARG()),
-                \safeShell($sqlFile, ShellContextEnum::FILE()),
+                safeShell($user, ShellContextEnum::ARG()),
+                safeShell($pass, ShellContextEnum::ENV()),
+                safeShell($dbName, ShellContextEnum::ARG()),
+                safeShell($sqlFile, ShellContextEnum::FILE()),
             );
         } else {
             throw new Exception("Driver non supporté : $driver");
@@ -398,15 +495,15 @@ class TenantDatabaseManager
         self::createUser($env['DB_USERNAME'], $env['DB_PASSWORD']);
 
         \exec($importCmd, $output, $exitCode);
-        \runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
+        runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
 
         // grante privilleges
         self::grantPrivileges($env['DB_DATABASE'], $env['DB_USERNAME']);
 
         if ($exitCode !== 0) {
-            \runInConsole(fn () => $console?->writeln("<error>Erreur lors de l’import de la base de données : $dbName</error>"));
+            runInConsole(fn () => $console?->writeln("<error>Erreur lors de l’import de la base de données : $dbName</error>"));
         } else {
-            \runInConsole(fn () => $console?->writeln("<info>Base de données restaurée : $dbName</info>"));
+            runInConsole(fn () => $console?->writeln("<info>Base de données restaurée : $dbName</info>"));
         }
     }
 }

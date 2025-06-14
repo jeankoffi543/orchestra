@@ -12,8 +12,8 @@ class TestCase extends Orchestra
     {
         parent::setUp();
         // checking if public/storage/tenants folder exists
-        if (!File::exists(\base_path('public/storage/tenants'))) {
-            File::makeDirectory(\base_path('public/storage/tenants'), recursive: true);
+        if (!File::exists(base_path('public/storage/tenants'))) {
+            File::makeDirectory(base_path('public/storage/tenants'), recursive: true);
         }
     }
 
@@ -21,8 +21,8 @@ class TestCase extends Orchestra
     {
         parent::tearDown();
         // removing public/storage/tenants and site folders
-        File::exists(\base_path('public/storage/tenants')) && File::deleteDirectory(\base_path('public/storage/tenants'));
-        File::exists(\base_path('site'))                   && File::deleteDirectory(\base_path('site'));
+        File::exists(base_path('public/storage/tenants')) && File::deleteDirectory(base_path('public/storage/tenants'));
+        File::exists(base_path('site'))                   && File::deleteDirectory(base_path('site'));
     }
 
     protected function getPackageProviders($app)

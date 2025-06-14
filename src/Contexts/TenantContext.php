@@ -28,11 +28,17 @@ class TenantContext
         $this->config = $config;
     }
 
+    /**
+     * Remplace les valeurs de configuration actuelles par celles du tenant.
+     *
+     * Ne modifie pas les variables d'environnement, mais
+     * configure les valeurs de configuration en mémoire.
+     */
     public function apply(): void
     {
         // Remplacer la config en mémoire, pas l'env global
         foreach ($this->config as $key => $value) {
-            \config()->set($key, $value);
+            config()->set($key, $value);
         }
     }
 }
