@@ -3,6 +3,7 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Oor;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -30,6 +31,17 @@ class CreateTenantCommand extends Command
      */
     protected $signature = 'orchestra:create {name} {--force} {--domain= : Specify a domain name} {--driver= : Specify a database driver} {--migrate : Migrate the database.}';
 
+    /**
+     * Execute the console command to create a new tenant.
+     *
+     * This command retrieves the required arguments and options, validates them,
+     * and then uses the Oor facade to create a new tenant. It can optionally
+     * specify a domain and database driver, and run migrations if requested.
+     *
+     * @return int Command::SUCCESS on successful creation, Command::FAILURE on error
+     *
+     * @throws \Exception If an error occurs during tenant creation
+     */
     public function handle(): int
     {
         try {
@@ -38,20 +50,20 @@ class CreateTenantCommand extends Command
             $domain  = $this->option('domain');
             $driver  = $this->option('driver');
             $migrate = $this->option('migrate');
-            $driver  = $driver ?? \getDriver(\base_path('.env'));
+            $driver  = $driver ?? getDriver(base_path('.env'));
 
             // Vérification de la validité des données
             if (empty($name)) {
-                \runInConsole(fn () => $this->error('The tenant name is required.'));
+                runInConsole(fn () => $this->error('The tenant name is required.'));
 
                 return Command::FAILURE;
             }
 
             // Affichage pour vérifier les valeurs
-            \runInConsole(fn () => $this->info("Creating tenant: $name"));
+            runInConsole(fn () => $this->info("Creating tenant: $name"));
 
             if ($domain) {
-                \runInConsole(fn () => $this->info("With domain: $domain"));
+                runInConsole(fn () => $this->info("With domain: $domain"));
             }
 
             $migrate = $migrate ? true : false;
@@ -63,9 +75,12 @@ class CreateTenantCommand extends Command
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

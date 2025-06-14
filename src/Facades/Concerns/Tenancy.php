@@ -24,8 +24,8 @@ class Tenancy
 
     public static function init(string $moduleStubPath): void
     {
-        self::$sitePath       = \getBasePath();
-        self::$stubPasth      = \getStubPath();
+        self::$sitePath       = getBasePath();
+        self::$stubPasth      = getStubPath();
         self::$moduleStubPath = $moduleStubPath;
     }
 
@@ -58,9 +58,9 @@ class Tenancy
                 'domains' => ['required', new DomainRule()],
             ]);
 
-            $name     = \parseTenantName($data['name']);
+            $name     = parseTenantName($data['name']);
             $domain   = $data['domains'];
-            $basePath = \getBasePath($name);
+            $basePath = getBasePath($name);
 
             // stub
             $stubSite = "$moduleStubPath/.site";
@@ -78,10 +78,10 @@ class Tenancy
             File::copy("$basePath/.env.example", "$basePath/.env");
 
             // Generate database credentials
-            $credentials                = \generateDatabaseCredentials($name);
-            $credentials['DB_PASSWORD'] = \generatePassword(12);
+            $credentials                = generateDatabaseCredentials($name);
+            $credentials['DB_PASSWORD'] = generatePassword(12);
 
-            $request = \request();
+            $request = request();
             $scheme  = $request->getScheme();
 
             // set env content line by line
@@ -135,11 +135,11 @@ class Tenancy
     public static function deleteTenant(string $name, ?string $driver = 'pgsql', ?bool $rollback = false): void
     {
         try {
-            $name     = \parseTenantName($name);
-            $basePath = \getBasePath($name);
+            $name     = parseTenantName($name);
+            $basePath = getBasePath($name);
 
             // Generate database credentials
-            $credentials = \parseEnvPath($name);
+            $credentials = parseEnvPath($name);
 
             // unlink tenant storage
             Artisan::call("orchestra:unlink $name");
@@ -173,7 +173,7 @@ class Tenancy
     public static function parseDomainContent(array $content, $path): void
     {
         $content = '# Registered tenants' . PHP_EOL . PHP_EOL .
-            \collect($content)
+            collect($content)
             ->map(fn ($value, $key) => "{$key}={$value}")
             ->implode(PHP_EOL)
             . PHP_EOL;
@@ -264,16 +264,38 @@ class Tenancy
         }
     }
 
+    /**
+     * Retrieve the value of a specified environment variable from a file.
+     *
+     * This function looks for the given key in the environment file located at the specified path.
+     * If the key exists, its value is returned; otherwise, null is returned.
+     *
+     * @param string $key The name of the environment variable to retrieve.
+     * @param string|null $path The path to the environment file. If null, a default path is used.
+     *
+     * @return string|null The value of the environment variable, or null if the key does not exist.
+     */
     public static function getEnvValue(string $key, ?string $path = null): ?string
     {
         return isset(self::convertEnvFileToArray($path)[$key]) ? self::convertEnvFileToArray($path)[$key] : null;
     }
 
+    /**
+     * Set the value of a specified environment variable in a file.
+     *
+     * This function updates the environment file located at the specified path
+     * by setting the value of the given key to the given value. If the key
+     * does not exist in the file, it is added; otherwise, its value is updated.
+     *
+     * @param string $key The name of the environment variable to set.
+     * @param string $value The value to set for the environment variable.
+     * @param string|null $path The path to the environment file. If null, a default path is used.
+     */
     public static function setEnvValue(string $key, string $value, ?string $path = null): void
     {
         $env       = self::convertEnvFileToArray($path);
         $env[$key] = $value;
-        $env       = \collect($env)->map(function ($item, $key) {
+        $env       = collect($env)->map(function ($item, $key) {
             return "$key=$item";
         })->toArray();
         $envContent = \implode(PHP_EOL, \array_values($env)) . PHP_EOL;
@@ -331,7 +353,7 @@ class Tenancy
      */
     public static function _convertEnvFileToArray(array $env): array
     {
-        return \collect($env)->mapWithKeys(function ($item) {
+        return collect($env)->mapWithKeys(function ($item) {
             if (\strpos($item, '#') === 0) {
                 return [];
             }
@@ -344,9 +366,18 @@ class Tenancy
         })->toArray();
     }
 
+    /**
+     * Remove a domain associated with a tenant.
+     *
+     * This function removes the domain entry corresponding to the given tenant
+     * name from the tenants configuration file. After removing the domain,
+     * the updated list of tenants is saved back to the file.
+     *
+     * @param string $name The name of the tenant whose domain is to be removed.
+     */
     public static function removeDomain(string $name): void
     {
-        $tenantsFile = \getBasePath() . '/.tenants';
+        $tenantsFile = getBasePath() . '/.tenants';
         $tenants     = \parse_ini_file($tenantsFile);
 
         foreach ($tenants as $key => $value) {
@@ -358,17 +389,36 @@ class Tenancy
         self::parseDomainContent($tenants, $tenantsFile);
     }
 
+    /**
+     * Adds a domain associated with a tenant.
+     *
+     * This function adds the domain entry corresponding to the given tenant
+     * name to the tenants configuration file. If the domain already exists,
+     * it is not added again.
+     *
+     * @param string $name The name of the tenant whose domain is to be added.
+     * @param string $domain The domain to add to the tenant.
+     */
     public static function addDomain(string $name, string $domain): void
     {
         if (!self::getDomain($name)) {
-            $tenantsFile = \getBasePath() . '/.tenants';
+            $tenantsFile = getBasePath() . '/.tenants';
             File::append($tenantsFile, "$name=$domain\n");
         }
     }
 
+    /**
+     * Return the domain associated with a tenant.
+     *
+     * This function returns the domain associated with the given tenant
+     * name. If the tenant does not exist, it returns null.
+     *
+     * @param string $name The name of the tenant whose domain is to be retrieved.
+     * @return string|null The domain associated with the tenant, or null if the tenant does not exist.
+     */
     public static function getDomain(string $name): ?string
     {
-        $tenantsFile = \getBasePath() . '/.tenants';
+        $tenantsFile = getBasePath() . '/.tenants';
         $tenants     = \parse_ini_file($tenantsFile);
 
         return $tenants[$name] ?? null;
@@ -381,15 +431,27 @@ class Tenancy
      */
     public static function getTenants(): array
     {
-        $tenantsFile = \getBasePath() . '/.tenants';
+        $tenantsFile = getBasePath() . '/.tenants';
         $tenants     = \parse_ini_file($tenantsFile);
 
         return $tenants;
     }
 
+    /**
+     * Updates the domain associated with a tenant.
+     *
+     * This function updates the domain associated with the given tenant
+     * name. If the domain already exists, it is not added again.
+     * If the value of $domain is not null, it replaces the old
+     * domain with the new one.
+     *
+     * @param string $name The name of the tenant whose domain is to be updated.
+     * @param string $value The new name of the tenant.
+     * @param string|null $domain The new domain to associate with the tenant, or null to leave the domain unchanged.
+     */
     public static function updateDomain(string $name, string $value, ?string $domain = null): void
     {
-        $tenantsFile = \getBasePath() . '/.tenants';
+        $tenantsFile = getBasePath() . '/.tenants';
         $tenants     = \parse_ini_file($tenantsFile);
         if ($domain) {
             $tenants[$name] = $domain;
@@ -400,21 +462,40 @@ class Tenancy
         self::parseDomainContent($tenants, $tenantsFile);
     }
 
+    /**
+     * Return the name of the current tenant based on the current request domain.
+     *
+     * @return string|null The name of the current tenant, or null if no tenant is found with the current request domain.
+     */
     public static function getCurrent(): ?string
     {
-        $request = \request();
+        $request = request();
         $domain  = $request->getHost();
         $tenants = self::getTenants();
-        $name    = \collect($tenants)->filter(fn ($t) => $t === $domain)->toArray();
+        $name    = collect($tenants)->filter(fn ($t) => $t === $domain)->toArray();
 
         return \array_key_first($name);
     }
 
+    /**
+     * Switches to the current tenant based on the current request domain.
+     *
+     * This function determines the current tenant using the request's domain
+     * and switches the application context to that tenant.
+     */
     public static function switchToCurrent(): void
     {
         self::switchToTenant(self::getCurrent());
     }
 
+    /**
+     * Runs the given callback in the context of the current tenant.
+     *
+     * This function determines the current tenant using the request's domain
+     * and runs the given callback in the context of that tenant.
+     *
+     * @param Closure $callback The callback to run in the context of the current tenant.
+     */
     public static function useCurrent(Closure $callback): void
     {
         self::useTenant(self::getCurrent(), $callback);
@@ -436,11 +517,22 @@ class Tenancy
         Artisan::call("orchestra:migrate $name");
     }
 
+    /**
+     * Restores a tenant that was previously backed up and archived.
+     *
+     * This function restores a tenant by restoring its database and files.
+     * It also adds the tenant's domain to the list of domains.
+     *
+     * @param string $tenantName The name of the tenant to restore.
+     * @param string $driver The database driver to use for the tenant's database.
+     * @param OutputStyle $console An optional console object to use for output.
+     * @return void
+     */
     public static function restore(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): void
     {
-        $tenantName = \parseTenantName($tenantName);
+        $tenantName = parseTenantName($tenantName);
         TenantArchiver::restoreTenant($tenantName, $driver, $console);
-        $domain = \parse_ini_file(\getEnvPath($tenantName))['APP_DOMAIN'];
+        $domain = \parse_ini_file(getEnvPath($tenantName))['APP_DOMAIN'];
         self::addDomain($tenantName, $domain);
     }
 
@@ -456,13 +548,13 @@ class Tenancy
     public static function updateTenant(array $data, ?string $driver = 'pgsql'): void
     {
         try {
-            $name     = \parseTenantName($data['name']);
-            $basePath = \getBasePath($name);
+            $name     = parseTenantName($data['name']);
+            $basePath = getBasePath($name);
             if (File::exists($basePath)) {
-                $newTenantName = \parseTenantName($data['by']);
+                $newTenantName = parseTenantName($data['by']);
                 $domain        = null;
 
-                $request = \request();
+                $request = request();
                 $scheme  = $request->getScheme();
 
                 // Update tenant env
@@ -482,7 +574,7 @@ class Tenancy
 
 
                 // Rename tenant directory
-                File::move($basePath, \getBasePath($newTenantName));
+                File::move($basePath, getBasePath($newTenantName));
                 Artisan::call("orchestra:unlink $name");
                 Artisan::call("orchestra:link $newTenantName --force");
             } else {
@@ -496,11 +588,18 @@ class Tenancy
         }
     }
 
+    /**
+     * Switch to a tenant
+     *
+     * @param string|null $name The tenant name
+     *
+     * @throws \Exception
+     */
     public static function switchToTenant(?string $name = null): void
     {
         $tenantManager = new TenantManager();
         try {
-            $name = \parseTenantName($name);
+            $name = parseTenantName($name);
 
             $tenantManager->switchTo($name);
         } catch (\Exception $e) {
@@ -511,11 +610,23 @@ class Tenancy
         }
     }
 
+    /**
+     * Run the given callback in the context of the given tenant.
+     *
+     * This function determines the given tenant using the given name
+     * and runs the given callback in the context of that tenant.
+     *
+     * @param string $name The tenant name
+     * @param Closure $callback The callback to run in the context of the given tenant
+     * @return void
+     *
+     * @throws \Exception If the tenant is not found or if there is a problem while running the callback.
+     */
     public static function useTenant(string $name, Closure $callback): void
     {
         $tenantManager = new TenantManager();
         try {
-            $name = \parseTenantName($name);
+            $name = parseTenantName($name);
             $tenantManager->runFor($name, $callback);
             $tenantManager->rebase($name);
         } catch (\Exception $e) {
@@ -526,14 +637,24 @@ class Tenancy
         }
     }
 
+    /**
+     * Reload the domains from the .tenants file and the site directory.
+     *
+     * This function reads the .tenants file and the directories in the site
+     * directory, and updates the domains in the database. If a directory does
+     * not have a corresponding domain in the .tenants file, it will be added
+     * to the .tenants file.
+     *
+     * @return void
+     */
     public static function reloadDomain(): void
     {
         // TODO
         // \dd('dd');
-        $tenantsFile = \getBasePath() . '/.tenants';
+        $tenantsFile = getBasePath() . '/.tenants';
         $tenants     = \parse_ini_file($tenantsFile);
         // get directories name from site directory
-        $directories = \array_diff(\scandir(\getBasePath()), ['.', '..', '.gitignore', '.tenants']);
+        $directories = \array_diff(\scandir(getBasePath()), ['.', '..', '.gitignore', '.tenants']);
 
         foreach ($directories as $directory) {
             if (!isset($tenants[$directory])) {
@@ -549,7 +670,7 @@ class Tenancy
      */
     public static function listTenants(): array
     {
-        $directoryIterator = self::directoryIterator(\getBasePath());
+        $directoryIterator = self::directoryIterator(getBasePath());
         $tenants           = [];
         foreach ($directoryIterator as $directory) {
             if (self::getDomain($fileName = $directory->getFilename())) {

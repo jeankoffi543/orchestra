@@ -3,6 +3,7 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Oor;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -30,6 +31,16 @@ class UpdateTenantCommand extends Command
      */
     protected $signature = 'orchestra:update {name} {--by= : Specify the new tenant name} {--domain= : Specify the new tenant domain} {--driver= : Specify a database driver}';
 
+    /**
+     * Execute the console command to update a tenant.
+     *
+     * This command requires the existing tenant name and the new tenant name to update.
+     * It optionally accepts a new domain and database driver for the tenant.
+     *
+     * @return int Command::SUCCESS on success, Command::FAILURE on failure.
+     *
+     * @throws \Exception If an error occurs during the command execution.
+     */
     public function handle(): int
     {
         try {
@@ -38,23 +49,23 @@ class UpdateTenantCommand extends Command
             $driver = $this->option('driver');
             $by     = $this->option('by');
             $domain = $this->option('domain');
-            $driver = $driver ?? \getDriver(\base_path('.env'));
+            $driver = $driver ?? getDriver(base_path('.env'));
 
             // Vérification de la validité des données
             if (empty($name)) {
-                \runInConsole(fn () => $this->error('The tenant name is required.'));
+                runInConsole(fn () => $this->error('The tenant name is required.'));
 
                 return Command::FAILURE;
             }
 
             if (empty($by)) {
-                \runInConsole(fn () => $this->error('The new tenant name is required.'));
+                runInConsole(fn () => $this->error('The new tenant name is required.'));
 
                 return Command::FAILURE;
             }
 
             // Affichage pour vérifier les valeurs
-            \runInConsole(fn () => $this->info("Updating tenant: $name"));
+            runInConsole(fn () => $this->info("Updating tenant: $name"));
 
             Oor::update(
                 [
@@ -67,9 +78,12 @@ class UpdateTenantCommand extends Command
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

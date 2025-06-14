@@ -31,6 +31,13 @@ class InstallTenantCommand extends Command
      */
     protected $signature = 'orchestra:install  {master} {--domain= : master tenant domain}';
 
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     *
+     * @throws \Exception
+     */
     public function handle(): int
     {
         try {
@@ -42,18 +49,21 @@ class InstallTenantCommand extends Command
             }
 
             $installer = new Installer();
-            \runInConsole(fn () => $this->info('Installing Orchestra...'));
+            runInConsole(fn () => $this->info('Installing Orchestra...'));
             // directory initialisation
             $info = $installer->prepareInstallation($master, $domain);
 
-            \runInConsole(fn () => $this->info($info));
+            runInConsole(fn () => $this->info($info));
 
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

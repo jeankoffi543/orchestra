@@ -55,23 +55,54 @@ class OperaBuilder
         Tenancy::updateTenant($data, $driver);
     }
 
+    /**
+     * Switch to a tenant.
+     *
+     * This function switches the current tenant context to the given tenant name.
+     * If no tenant name is provided, it will switch to the default tenant.
+     *
+     * @param string|null $name The name of the tenant to switch to, or null to switch to the default tenant.
+     * @return void
+     */
     protected function switchToTenant(?string $name = null): void
     {
         Tenancy::switchToTenant($name);
     }
 
+    /**
+     * Execute a given callback within the context of a specified tenant.
+     *
+     * This function temporarily switches the application's context to the
+     * specified tenant, executes the provided callback, and then reverts
+     * back to the original context.
+     *
+     * @param string $name The tenant's name to switch context to.
+     * @param Closure $callback The callback to execute within the tenant's context.
+     * @return void
+     *
+     * @throws \Exception If the tenant is not found or if an error occurs while switching the context.
+     */
     protected function useTenant(string $name, Closure $callback): void
     {
         Tenancy::useTenant($name, $callback);
     }
 
+    /**
+     * Initialize the Orchestra class by setting the .stub path and site path.
+     *
+     * It also creates the site/.tenants file if it does not exist.
+     *
+     * @return void
+     *
+     * @throws \Exception If an error occurs while initializing the class.
+     */
     private function init(): void
     {
         // .stub
         try {
             TenantDatabaseManager::connect();
-            $this->sitePath       = \getBasePath();
-            $this->stubPasth      = \getStubPath();
+            $this->sitePath       = getBasePath();
+            $this->stubPasth      = getStubPath();
             $this->moduleStubPath = __DIR__ . '/../../.stub';
             Tenancy::init(__DIR__ . '/../../.stub');
 
@@ -85,16 +116,38 @@ class OperaBuilder
         }
     }
 
+    /**
+     * Get the current tenant.
+     *
+     * @return string|null The current tenant's name, or null if no tenant is set.
+     */
     public function getCurrent(): ?string
     {
         return Tenancy::getCurrent();
     }
 
+    /**
+     * Switch to the current tenant.
+     *
+     * This function changes the tenant context to the current tenant
+     * based on the current request domain.
+     *
+     * @return void
+     */
     public function switchToCurrent(): void
     {
         Tenancy::switchToTenant(Tenancy::getCurrent());
     }
 
+    /**
+     * Run the given callback in the context of the current tenant.
+     *
+     * This function determines the current tenant using the request's domain
+     * and runs the given callback in the context of that tenant.
+     *
+     * @param Closure $callback The callback to run in the context of the current tenant.
+     * @return void
+     */
     public function useCurrent(Closure $callback): void
     {
         Tenancy::useTenant(Tenancy::getCurrent(), $callback);
@@ -112,6 +165,14 @@ class OperaBuilder
         Tenancy::migrate($credentials, $name);
     }
 
+    /**
+     * Restore a tenant that was previously backed up and archived.
+     *
+     * @param string $tenantName The name of the tenant to restore.
+     * @param string $driver The database driver to use for the tenant's database.
+     * @param OutputStyle $console An optional console object to use for output.
+     * @return void
+     */
     public function restoreTenant(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): void
     {
         Tenancy::restore($tenantName, $driver, $console);

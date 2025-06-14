@@ -31,6 +31,14 @@ class UninstallTenantCommand extends Command
      */
     protected $signature = 'orchestra:uninstall {master}';
 
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     */
+    /**
+     * @throws \Exception
+     */
     public function handle(): int
     {
         try {
@@ -39,17 +47,20 @@ class UninstallTenantCommand extends Command
             }
 
             $installer = new Installer();
-            \runInConsole(fn () => $this->info('Uninstalling Orchestra...'));
+            runInConsole(fn () => $this->info('Uninstalling Orchestra...'));
             // directory initialisation
             $info = $installer->prepareUnInstallation($master);
 
-            \runInConsole(fn () => $this->info($info));
+            runInConsole(fn () => $this->info($info));
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            \runInConsole(fn () => $this->error($e->getMessage()));
+            runInConsole(function () use ($e) {
+                $this->error($e->getMessage());
 
-            return Command::FAILURE;
+                return Command::FAILURE;
+            });
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
