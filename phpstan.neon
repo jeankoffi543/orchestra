@@ -1,0 +1,13 @@
+includes:
+
+parameters:
+    paths:
+        - src
+        
+    level: 6 # Niveau d’analyse entre 0 (le plus bas) et 9 (le plus strict)
+    reportUnmatchedIgnoredErrors: false
+
+    ignoreErrors:
+        - '#Call to an undefined method Illuminate\\Support\\Collection::foobar#'
+
+    checkMissingCallableSignature: false

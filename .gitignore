@@ -1,0 +1,9 @@
+.vscode
+.git
+/vendor
+/build
+.env
+composer.lock
+/node_modules
+/build
+.phpunit.result.cache

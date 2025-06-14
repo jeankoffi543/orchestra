@@ -1,0 +1,10 @@
+{
+   "preset": "laravel",
+   "rules": {
+       "array_syntax": {"syntax": "short"},
+        "braces": {"position_after_functions_and_oop_constructs": "same"},
+        "whitespace_after_comma_in_array": true,
+        "no_trailing_whitespace": true,
+        "trim_array_spaces": true
+   }
+}
