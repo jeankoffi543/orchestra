@@ -1,9 +1,5 @@
 <?php
 
-/**
- * @var $this
- *
- * */
 \test('Should create a tenant', function () {
     $faker = \Faker\Factory::create();
     \test()->artisan("orchestra:create $faker->word --domain=$faker->domainName --driver=sqlite")->assertExitCode(0);

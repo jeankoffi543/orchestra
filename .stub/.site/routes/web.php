@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-if (Storage::fileExists($path = base_path('routes/web.php'))) {
+if (Storage::exists($path = base_path('routes/web.php'))) {
     Route::middleware('web')
         ->group($path);
 }
