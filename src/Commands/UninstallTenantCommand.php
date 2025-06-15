@@ -29,7 +29,7 @@ class UninstallTenantCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'orchestra:uninstall {master}';
+    protected $signature = 'orchestra:uninstall {master} {--driver= : master tenant database driver}';
 
     /**
      * Execute the console command.
@@ -49,9 +49,9 @@ class UninstallTenantCommand extends Command
             $installer = new Installer();
             runInConsole(fn () => $this->info('Uninstalling Orchestra...'));
             // directory initialisation
-            $info = $installer->prepareUnInstallation($master);
-
-            runInConsole(fn () => $this->info($info));
+            $driver = $this->option('driver');
+            $driver = $driver ?? getDriver(base_path('.env'));
+            $installer->prepareUnInstallation($master, $driver, $this->output);
 
             return Command::SUCCESS;
         } catch (\Exception $e) {

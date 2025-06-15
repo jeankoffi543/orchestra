@@ -82,17 +82,24 @@ class Installer extends OperaBuilder
     }
 
     /**
-     * Uninstall Orchestra from the current application.
+     * Uninstalls Orchestra.
      *
-     * It removes the master tenant and the TenantServiceProvider from the providers list.
+     * It removes the master tenant, removes the TenantServiceProvider from the application's providers list,
+     * unpublishes the Orchestra configuration file from the application's configuration directory,
+     * and removes the Orchestra configuration file from the application's composer autoload.
      *
-     * @param string $master the name of the master tenant
+     * If the uninstallation is successful, it formats the code using `pint`.
      *
-     * @return string a message indicating the uninstallation is complete
+     * @param string $master The name of the master tenant.
+     * @param string $driver The name of the driver to use for the uninstallation.
+     * @param OutputStyle|null $output An optional instance of `OutputStyle` to display information
+     *                                about the uninstallation process.
      *
-     * @throws \Exception if an error occurs during the uninstallation process
+     * @return void
+     *
+     * @throws Exception If an error occurs during the uninstallation process.
      */
-    public function prepareUnInstallation(string $master): string
+    public function prepareUnInstallation(string $master, string $driver, ?OutputStyle $output): void
     {
         try {
             Tenancy::validateData(
@@ -104,32 +111,14 @@ class Installer extends OperaBuilder
                 ]
             );
 
-            $info = '';
+            Artisan::call("orchestra:delete $master --driver=$driver");
 
-            // create master_tenant
-            Artisan::call('orchestra:delete', [
-                'name'     => $master,
-                '--driver' => 'pgsql',
-            ]);
-            // get providers directory
-            if (File::exists($providerFile = $this->getProviderDirectory('Providers') . '/TenantServiceProvider.php')) {
-                File::delete($providerFile);
-            };
-
-            $hasNewBootstrap = \file_exists(base_path('bootstrap/providers.php'));
-            $hasOldConfig    = \file_exists(config_path('app.php'));
-
-            if ($hasNewBootstrap) {
-                $info = "Retirrez manuellement App\\Providers\\TenantServiceProvider::class dans bootstrap/providers.php sous 'providers'.";
-            } elseif ($hasOldConfig) {
-                $info = "Retirrez manuellement App\\Providers\\TenantServiceProvider::class dans config/app.php sous 'providers'.";
-            }
+            $this->removeModuleProviderToAppConfig();
+            $this->unpublishConfig();
 
             Artisan::call("orchestra:autoload:remove $master");
 
-            $info .= PHP_EOL . PHP_EOL . 'Uninstallation complete';
-
-            return $info;
+            $output && runInConsole(fn () => $output->info('Uninstallation complete'));
         } catch (\Exception $e) {
             throw new Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -207,6 +196,65 @@ class Installer extends OperaBuilder
         \file_put_contents($configPath, $content);
 
         $this->addPintPath($configPath);
+    }
+
+    /**
+     * Removes the Orchestra configuration file from the application's
+     * configuration directory.
+     */
+    public function unpublishConfig(): void
+    {
+        $configPath = config_path('orchestra.php');
+
+        if (File::exists($configPath)) {
+            File::delete($configPath);
+        }
+    }
+
+    /**
+     * Removes the TenantServiceProvider from the application's providers list.
+     *
+     * It uses the $providerClass parameter to search for the line that contains
+     * the TenantServiceProvider class in the application's providers list.
+     * If the line is found, it is removed from the list.
+     *
+     * The provider is removed from the following files:
+     * - bootstrap/providers.php (Laravel >= 8.0)
+     * - config/app.php (Laravel < 8.0)
+     *
+     * If the file does not exist, the method does nothing.
+     *
+     * The method also formats the code using Laravel Pint if it is available.
+     *
+     * @param string $providerClass The class name of the provider to remove.
+     *                               Defaults to 'App\\Providers\\TenantServiceProvider::class'.
+     */
+    public function removeModuleProviderToAppConfig(string $providerClass = 'App\\Providers\\TenantServiceProvider::class'): void
+    {
+        removeFileSecurely($this->getProviderDirectory('Providers') . '/TenantServiceProvider.php');
+
+        $appConfigPath = \file_exists(base_path('bootstrap/providers.php'))
+            ? base_path('bootstrap/providers.php')
+            : (\file_exists(config_path('app.php')) ? config_path('app.php') : null);
+
+        if (!$appConfigPath) {
+            return;
+        }
+
+        $content = \file($appConfigPath); // Lecture ligne par ligne
+        // $quoted = rtrim($providerClass, ':class'); // En cas de format :class
+        $providerLinePattern = '/^\s*' . \preg_quote($providerClass, '/') . '\s*,?\s*$/';
+
+        $filtered = \array_filter($content, function ($line) use ($providerLinePattern) {
+            return !\preg_match($providerLinePattern, $line);
+        });
+
+        \file_put_contents($appConfigPath, \implode('', $filtered));
+
+        // Formatter avec Laravel Pint si disponible
+        if (\file_exists(base_path('vendor/bin/pint'))) {
+            \exec('./vendor/bin/pint ' . \escapeshellarg($appConfigPath));
+        }
     }
 
     /**
