@@ -338,3 +338,41 @@ if (!\function_exists('runInConsole')) {
         }
     }
 }
+
+if (!\function_exists('module_path')) {
+    /**
+     * Return the path of the module.
+     *
+     * If $path is provided, it will be appended to the module path.
+     * If $path is null, the module path will be returned as is.
+     *
+     * @param string|null $path The path to append to the module path.
+     * @return string The module path.
+     */
+    function module_path(?string $path = null): string
+    {
+        return \dirname(__DIR__, 1) . ($path ? "/$path" : '');
+    }
+}
+
+if (!\function_exists('getTeantPathIfExists')) {
+    /**
+     * Get the path of a tenant's directory if it exists.
+     *
+     * This function checks if the tenant's directory exists in the base path under "site".
+     * If it exists, the function returns the path; otherwise, it returns null.
+     *
+     * @param string $name The name of the tenant.
+     * @return string|null The path to the tenant's directory, or null if it does not exist.
+     */
+
+    function getTeantPathIfExists(string $name): ?string
+    {
+        $name = parseTenantName($name);
+        if (File::exists($path = base_path("site/$name"))) {
+            return $path;
+        }
+
+        return null;
+    }
+}

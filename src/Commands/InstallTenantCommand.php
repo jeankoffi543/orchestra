@@ -29,7 +29,7 @@ class InstallTenantCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'orchestra:install  {master} {--domain= : master tenant domain}';
+    protected $signature = 'orchestra:install  {master} {--domain= : master tenant domain} {--driver= : master tenant database driver}';
 
     /**
      * Execute the console command.
@@ -47,14 +47,14 @@ class InstallTenantCommand extends Command
             if (! $domain = $this->option('domain')) {
                 throw new \Exception('master tenant domain is required', Response::HTTP_BAD_REQUEST);
             }
+            $driver = $this->option('driver');
+            $driver = $driver ?? getDriver(base_path('.env'));
 
             $installer = new Installer();
             runInConsole(fn () => $this->info('Installing Orchestra...'));
-            // directory initialisation
-            $info = $installer->prepareInstallation($master, $domain);
 
-            runInConsole(fn () => $this->info($info));
-
+            // directory initialisation and master tenant creation
+            $installer->prepareInstallation($master, $domain, $driver, $this->output);
 
             return Command::SUCCESS;
         } catch (\Exception $e) {

@@ -2,8 +2,6 @@
 
 namespace Kjos\Orchestra\Contexts;
 
-use Closure;
-
 class TenantManager
 {
     protected ?TenantContext $current = null;
@@ -76,10 +74,10 @@ class TenantManager
      * Switches to the specified tenant and executes a callback function within the tenant's context.
      *
      * @param string $tenant The tenant to switch to.
-     * @param \Closure $callback The callback function to execute within the tenant's context.
-     * @return Closure The result of the callback function.
+     * @param \Closure(TenantContext): mixed $callback The callback function that receives the tenant context.
+     * @return mixed The result of the callback function.
      */
-    public function runFor(string $tenant, \Closure $callback): Closure
+    public function runFor(string $tenant, \Closure $callback): mixed
     {
         $this->switchTo($tenant);
 
