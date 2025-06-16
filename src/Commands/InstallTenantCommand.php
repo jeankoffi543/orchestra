@@ -57,7 +57,7 @@ class InstallTenantCommand extends Command
             runInConsole(fn () => $this->info('Installing Orchestra...'));
 
             // directory initialisation and master tenant creation
-            $installer->prepareInstallation($master, $domain, $driver, $rollback, $this->output);
+            $installer->prepareInstallation(parseTenantName($master), $domain, $driver, $rollback, $this->output);
 
             return Command::SUCCESS;
         } catch (\Exception $e) {

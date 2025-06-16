@@ -27,6 +27,7 @@ class TenantManager
             'database.connections.pgsql.database' => $env['DB_DATABASE'] ?? 'forge',
             'database.connections.pgsql.username' => $env['DB_USERNAME'] ?? 'forge',
             'database.connections.pgsql.password' => $env['DB_PASSWORD'] ?? '',
+            'app.key'                             => $env['APP_KEY']     ?? 'base64:' . \base64_encode(\random_bytes(32)),
             'filesystems.disks.local.root'        => base_path("site/{$tenant}/storage/app/private"),
             'filesystems.disks.public.root'       => base_path("site/{$tenant}/storage/app/public"),
             'filesystems.disks.public.url'        => env('APP_URL') . "/storage/{$tenant}",
