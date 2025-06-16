@@ -5,6 +5,7 @@ namespace Kjos\Orchestra\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Concerns\Installer;
+use Kjos\Orchestra\Facades\Concerns\RollbackManager;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'orchestra:uninstall')]
@@ -41,6 +42,8 @@ class UninstallTenantCommand extends Command
      */
     public function handle(): int
     {
+        $rollback = new RollbackManager();
+
         try {
             if (! $master = $this->argument('master')) {
                 throw new \Exception('master tenant name is required', Response::HTTP_BAD_REQUEST);
@@ -51,7 +54,7 @@ class UninstallTenantCommand extends Command
             // directory initialisation
             $driver = $this->option('driver');
             $driver = $driver ?? getDriver(base_path('.env'));
-            $installer->prepareUnInstallation($master, $driver, $this->output);
+            $installer->prepareUnInstallation($master, $driver, $rollback, $this->output);
 
             return Command::SUCCESS;
         } catch (\Exception $e) {

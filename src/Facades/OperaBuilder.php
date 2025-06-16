@@ -7,6 +7,7 @@ use Illuminate\Console\OutputStyle;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
+use Kjos\Orchestra\Facades\Concerns\RollbackManager;
 use Kjos\Orchestra\Facades\Concerns\Tenancy;
 use Kjos\Orchestra\Services\TenantDatabaseManager;
 
@@ -37,9 +38,9 @@ class OperaBuilder
         Tenancy::createTenant($data, $driver, $migrate);
     }
 
-    protected function deleteTenant(string $name, ?string $driver = 'pgsql', ?bool $rollback = false): void
+    protected function deleteTenant(string $name, ?string $driver = 'pgsql', ?string $domain = ''): void
     {
-        Tenancy::deleteTenant($name, $driver, $rollback);
+        Tenancy::deleteTenant($name, $driver, $domain);
     }
 
     /**
@@ -47,12 +48,11 @@ class OperaBuilder
      *
      * @param array<string, mixed> $data An associative array containing the updated tenant data,
      *                                   including the 'name' of the tenant and any other fields to update.
-     * @param string|null $driver The database driver to be used, default is 'pgsql'.
      * @return void
      */
-    protected function updateTenant(array $data, ?string $driver = 'pgsql'): void
+    protected function updateTenant(array $data): void
     {
-        Tenancy::updateTenant($data, $driver);
+        Tenancy::updateTenant($data);
     }
 
     /**
@@ -154,15 +154,17 @@ class OperaBuilder
     }
 
     /**
-     * Run the database migrations for the given tenant.
+     * Migrate a tenant.
      *
      * @param array<string, mixed> $credentials The database credentials for the tenant.
-     * @param string $name The name of the tenant.
+     * @param string $name The name of the tenant to migrate.
+     * @param RollbackManager $rollback The rollback manager to use for the migration.
+     * @param bool $exists Whether the tenant already exists.
      * @return void
      */
-    public function migrate(array $credentials, string $name): void
+    public function migrate(array $credentials, string $name, RollbackManager $rollback, bool $exists): void
     {
-        Tenancy::migrate($credentials, $name);
+        Tenancy::migrate($credentials, $name, $rollback, $exists);
     }
 
     /**

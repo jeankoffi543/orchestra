@@ -27,24 +27,25 @@ class Installer extends OperaBuilder
     }
 
     /**
-     * Prepares the installation of Orchestra.
+     * Prepares the installation of the given master tenant.
      *
-     * It creates a master tenant, adds the TenantServiceProvider to the application's providers list,
-     * publishes the Orchestra configuration file to the application's configuration directory,
-     * and migrates the database for the master tenant.
+     * This function validates the provided tenant data, creates a new master tenant directory with a stub site,
+     * generates database credentials, and migrates the tenant's database schema.
+     * It also links the tenant storage, adds the tenant's domain to the tenants file,
+     * adds the TenantServiceProvider to the application's providers list,
+     * publishes the configuration file,
+     * and formats the code using Laravel Pint if it is available.
      *
-     * If the installation is successful, it formats the code using `pint`.
+     * @param string $master The name of the master tenant to install.
+     * @param string $domain The domain of the master tenant to install.
+     * @param string $driver The database driver to use, default is 'pgsql'.
+     * @param RollbackManager $rollback The rollback manager to use.
+     * @param OutputStyle|null $output The output style to use (optional).
      *
-     * @param string $master The name of the master tenant.
-     * @param string $domain The domain of the master tenant.
-     * @param OutputStyle|null $output An optional instance of `OutputStyle` to display information
-     *                                about the installation process.
-     *
+     * @throws \Exception If an error occurs during the installation process.
      * @return void
-     *
-     * @throws Exception If an error occurs during the installation process.
      */
-    public function prepareInstallation(string $master, string $domain, string $driver, ?OutputStyle $output = null)
+    public function prepareInstallation(string $master, string $domain, string $driver, RollbackManager $rollback, ?OutputStyle $output = null): void
     {
         try {
             Tenancy::validateData(
@@ -63,14 +64,33 @@ class Installer extends OperaBuilder
 
             $output->info('Migration de la base de donnée effectuée.');
 
-            $this->addModuleProviderToAppConfig();
-            $output && runInConsole(fn () => $output->info('App\\Providers\\TenantServiceProvider::class ajouté au providers.'));
+            rollback_catch(
+                function () use ($output, $rollback) {
+                    $this->addModuleProviderToAppConfig();
+                    $output && runInConsole(fn () => $output->info('App\\Providers\\TenantServiceProvider::class ajouté au providers.'));
+                    $rollback->add(fn () => $this->removeModuleProviderToAppConfig());
+                },
+                $rollback
+            );
 
-            $this->publishConfig($master, $domain);
-            $output && runInConsole(fn () => $output->info('Fichier de configuration publié.'));
 
-            Artisan::call("orchestra:autoload:add $master");
-            $output && runInConsole(fn () => $output->info('Configuration du composer effectuée'));
+            rollback_catch(
+                function () use ($output, $master, $domain, $rollback) {
+                    $this->publishConfig($master, $domain);
+                    $output && runInConsole(fn () => $output->info('Fichier de configuration publié.'));
+                    $rollback->add(fn () => $this->unpublishConfig());
+                },
+                $rollback
+            );
+
+            rollback_catch(
+                function () use ($output, $master, $rollback) {
+                    Artisan::call("orchestra:autoload:add $master");
+                    $output && runInConsole(fn () => $output->info('Configuration du composer effectuée'));
+                    $rollback->add(fn () => Artisan::call("orchestra:autoload:remove $master"));
+                },
+                $rollback
+            );
 
             $output && runInConsole(fn () => $output->info('Installation complete'));
 
@@ -82,24 +102,18 @@ class Installer extends OperaBuilder
     }
 
     /**
-     * Uninstalls Orchestra.
+     * Prepare the uninstallation process of the given master tenant.
      *
-     * It removes the master tenant, removes the TenantServiceProvider from the application's providers list,
-     * unpublishes the Orchestra configuration file from the application's configuration directory,
-     * and removes the Orchestra configuration file from the application's composer autoload.
-     *
-     * If the uninstallation is successful, it formats the code using `pint`.
+     * It is expected that the tenant has been already validated.
      *
      * @param string $master The name of the master tenant.
-     * @param string $driver The name of the driver to use for the uninstallation.
-     * @param OutputStyle|null $output An optional instance of `OutputStyle` to display information
-     *                                about the uninstallation process.
+     * @param string $driver The database driver to use.
+     * @param RollbackManager $rollback The rollback manager to use.
+     * @param OutputStyle|null $output The output style to use (optional).
      *
-     * @return void
-     *
-     * @throws Exception If an error occurs during the uninstallation process.
+     * @throws \Exception If there is a problem while uninstalling the tenant.
      */
-    public function prepareUnInstallation(string $master, string $driver, ?OutputStyle $output): void
+    public function prepareUnInstallation(string $master, string $driver, RollbackManager $rollback, ?OutputStyle $output): void
     {
         try {
             Tenancy::validateData(
@@ -113,11 +127,25 @@ class Installer extends OperaBuilder
 
             Artisan::call("orchestra:delete $master --driver=$driver");
 
-            $this->removeModuleProviderToAppConfig();
-            $this->unpublishConfig();
+            rollback_catch(
+                function () use ($master, $rollback) {
+                    $domain = config('orchestra.master_tenant.domain');
+                    $this->removeModuleProviderToAppConfig();
+                    $rollback->add(fn () => $this->addModuleProviderToAppConfig());
 
-            Artisan::call("orchestra:autoload:remove $master");
+                    $this->unpublishConfig();
+                    $domain != null && $rollback->add(fn () => $this->publishConfig($master, $domain));
+                },
+                $rollback
+            );
 
+            rollback_catch(
+                function () use ($master, $rollback) {
+                    Artisan::call("orchestra:autoload:remove $master");
+                    $rollback->add(fn () => Artisan::call("orchestra:autoload:add $master"));
+                },
+                $rollback
+            );
             $output && runInConsole(fn () => $output->info('Uninstallation complete'));
         } catch (\Exception $e) {
             throw new Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);

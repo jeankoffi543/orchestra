@@ -8,7 +8,7 @@ class PassWordRule implements Rule
 {
     public function passes($attribute, $value): bool
     {
-        return (bool) \preg_match('/^[a-zA-Z0-9!@#%^&*_+=\-?]{6,64}$/', $value);
+        return (bool) \preg_match('/^[a-zA-Z0-9!@#%^&*_+=\-?]{6,64}$/', \trim($value, '"'));
     }
 
     public function message(): string

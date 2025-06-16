@@ -13,77 +13,127 @@ use ZipArchive;
 class TenantArchiver
 {
     /**
-     * Archive a tenant by creating a zip archive containing the tenant's site
-     * directory and a dump of its database.
+     * Archives a tenant's site and database.
      *
-     * @param string $tenantName the name of the tenant to archive
-     * @param string $driver the database driver to use (default is 'pgsql')
-     * @param OutputStyle|null $console the console output (default is null)
-     * @return string the path to the archive file
+     * This function creates a timestamped archive of a tenant's site directory and
+     * database. It securely creates a directory, moves the tenant's site directory
+     * to the archive location, and dumps the database. A ZIP archive is then created
+     * from the archived directory. Rollback procedures are implemented to undo
+     * actions in case of failure.
      *
-     * @throws Exception if there is a problem while archiving the tenant
+     * @param string $tenantName The name of the tenant to archive.
+     * @param string $driver The database driver to use for dumping the database. Defaults to 'pgsql'.
+     * @param RollbackManager $rollback A manager to handle rollback operations in case of failure.
+     * @param OutputStyle|null $console An optional console output interface for logging messages.
+     *
+     * @return string The path to the created ZIP file.
+     *
+     * @throws Exception If any error occurs during the archiving process.
      */
-    public static function archiveTenant(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): string
+    public static function archiveTenant(string $tenantName, RollbackManager $rollback, string $driver = 'pgsql', ?OutputStyle $console = null): string
     {
         try {
             $timestamp   = now()->format('Ymd_His');
             $archiveBase = getArchiveBase("{$tenantName}_{$timestamp}");
 
             // 1. Créer le dossier
-            createDirectorySecurely($archiveBase);
+            rollback_catch(
+                function () use ($archiveBase, $rollback) {
+                    createDirectorySecurely($archiveBase);
+                    $rollback->add(fn () => removeFileSecurely($archiveBase));
+                },
+                $rollback
+            );
 
             // 2. Déplacer le dossier site
             $sitePath         = checkFileExists(getBasePath($tenantName));
             $archivedSitePath = "{$archiveBase}/site";
 
-            moveDirectorySecurely($sitePath, $archivedSitePath);
+            rollback_catch(
+                function () use ($archivedSitePath, $sitePath, $rollback) {
+                    moveDirectorySecurely($sitePath, $archivedSitePath);
+                    $rollback->add(fn () => moveDirectorySecurely($archivedSitePath, $sitePath));
+                },
+                $rollback
+            );
+
 
             // 3. dump data base
             $envPath = checkFileExists("{$archivedSitePath}");
-            TenantDatabaseManager::dump($envPath, $archiveBase, $console, $driver);
+            rollback_catch(
+                function () use ($envPath, $archiveBase, $console, $driver, $rollback) {
+                    TenantDatabaseManager::dump($envPath, $archiveBase, $console, $driver);
+                    $rollback->add(fn () => TenantDatabaseManager::import($envPath, $archiveBase, $console, $driver));
+                },
+                $rollback
+            );
 
             // 4. Création du zip
-            return self::zip($archiveBase, $console);
+            rollback_catch(
+                function () use ($archiveBase, $console, &$zip, $rollback) {
+                    $zip = self::zip($archiveBase, $console);
+                    $rollback->add(fn () => self::unzip("$archiveBase.zip", $console));
+                },
+                $rollback
+            );
+
+            return $zip;
         } catch (Exception $e) {
-            Tenancy::rollback($tenantName, deleteTenant: false);
             throw new Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Restore a tenant from an archive.
+     * Restores a tenant's site and database from a ZIP archive.
      *
-     * 1. Get ziping file from tenant name
-     * 2. Unzip the file
-     * 3. Restore the database
-     * 4. Restore the tenant directory
-     * 5. Clean up the temporary extraction
+     * This function retrieves and extracts a tenant's ZIP archive, restores the
+     * site directory and database, and performs cleanup of temporary files.
+     * Rollback procedures are implemented to undo actions in case of failure.
      *
      * @param string $tenantName The name of the tenant to restore.
-     * @param string $driver The database driver to use.
-     * @param OutputStyle|null $console The console output style.
+     * @param string $driver The database driver to use for importing the database. Defaults to 'pgsql'.
+     * @param RollbackManager $rollback A manager to handle rollback operations in case of failure.
+     * @param OutputStyle|null $console An optional console output interface for logging messages.
      *
-     * @throws \Exception If the tenant is not found or if there is a problem while restoring it.
+     * @throws Exception If any error occurs during the restoration process.
      */
-    public static function restoreTenant(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): void
+    public static function restoreTenant(string $tenantName, RollbackManager $rollback, string $driver = 'pgsql', ?OutputStyle $console = null): void
     {
         try {
             // get ziping file from tenant name
             $zipPath = self::getTenantZippingFileFromName($tenantName, true);
             if (self::isZipOpenable($zipPath)) {
-                $extractPath = self::unzip($zipPath, $console);
+                rollback_catch(
+                    function () use ($zipPath, $console, &$extractPath, $rollback) {
+                        $extractPath = self::unzip($zipPath, $console);
+                        $rollback->add(fn () => self::zip(\trim($zipPath, '.zip'), $console));
+                    },
+                    $rollback
+                );
 
                 // 2. Récupération des chemins
                 $sitePath = checkFileExists("$extractPath/site");
                 $envPath  = checkFileExists("$sitePath/.env");
 
                 // 3 restaurer la base de données
-                TenantDatabaseManager::import($envPath, $extractPath, $console, $driver);
+                rollback_catch(
+                    function () use ($envPath, $console, $extractPath, $driver, $rollback) {
+                        TenantDatabaseManager::import($envPath, $extractPath, $console, $driver);
+                        $rollback->add(fn () => TenantDatabaseManager::dump($envPath, $extractPath, $console, $driver));
+                    },
+                    $rollback
+                );
+
 
                 // 4. Restaurer le dossier du tenant
-                moveDirectorySecurely($sitePath, $destination = getBasePath($tenantName));
-                runInConsole(fn () => $console?->writeln("<info>Dossier du tenant restauré vers : $destination</info>"));
-
+                rollback_catch(
+                    function () use ($sitePath, $console, $tenantName, $rollback) {
+                        moveDirectorySecurely($sitePath, $destination = getBasePath($tenantName));
+                        runInConsole(fn () => $console?->writeln("<info>Dossier du tenant restauré vers : $destination</info>"));
+                        $rollback->add(fn () => moveDirectorySecurely($destination, $sitePath));
+                    },
+                    $rollback
+                );
 
                 // 5. Nettoyer l'extraction temporaire
                 removeFileSecurely($zipPath);

@@ -46,21 +46,20 @@ class Orchestra extends OperaBuilder
      *
      * @return void
      */
-    public function delete(string $name, ?string $driver = 'pgsql'): void
+    public function delete(string $name, ?string $driver = 'pgsql', ?string $domain = ''): void
     {
-        $this->deleteTenant($name, $driver);
+        $this->deleteTenant($name, $driver, $domain);
     }
 
     /**
      * Update a tenant.
      *
      * @param array<string, mixed> $data tenant data
-     * @param string|null $driver database driver
      * @return void
      */
-    public function update(array $data, ?string $driver = 'pgsql'): void
+    public function update(array $data): void
     {
-        $this->updateTenant($data, $driver);
+        $this->updateTenant($data);
     }
 
     /**

@@ -3,7 +3,6 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
 use Kjos\Orchestra\Contexts\TenantContext;
 use Kjos\Orchestra\Contexts\TenantManager;
@@ -15,50 +14,61 @@ class MigrateTenantCommand extends Command
 {
     protected $name        = 'orchestra:migrate';
     protected $description = 'Migrate a tenant database';
-    protected $signature   = 'orchestra:migrate {name : The name of the tenant} {--all : Migrate all tenants}';
+    protected $signature   = 'orchestra:migrate {name : The name of the tenant} {--all : Migrate all tenants} {--rollback-on-fail=true : Rollback on fail}';
 
     /**
      * Execute the console command.
      *
      * @param  TenantManager  $tenants
      * @return int
-     *
-     * @throws \Exception
      */
     public function handle(TenantManager $tenants): int
     {
+        /**
+         * @var array<string>
+         * */
+        $migratedTenants = [];
+        $rollbackOnFail  = $this->option('rollback-on-fail');
+
         try {
-            $name = $this->argument('name');
-
-
-
-            if (! app()->environment('testing')) {
-                if ($this->option('all')) {
-                    $tenantsArray = Oor::getTenants();
-                    foreach ($tenantsArray as $t) {
-                        $tenants->runFor($t, function (TenantContext $tenant) {
-                            runInConsole(fn () => $this->info("Migration du tenant: {$tenant->name}"));
-                            Artisan::call('migrate', ['--path' => 'database/migrations/tenants', '--force' => true]);
-                            runInConsole(fn () => $this->line(Artisan::output()));
-                        });
-                    }
-                } else {
-                    $tenants->runFor($name, function (TenantContext $tenant) {
+            if ($this->option('all')) {
+                foreach (Oor::getTenants() as $t) {
+                    $tenants->runFor($t, function (TenantContext $tenant) use (&$migratedTenants) {
                         runInConsole(fn () => $this->info("Migration du tenant: {$tenant->name}"));
                         Artisan::call('migrate', ['--path' => 'database/migrations/tenants', '--force' => true]);
+                        runInConsole(fn () => $this->line(Artisan::output()));
+
+                        // Ajouter à la liste si migration OK
+                        $migratedTenants[] = $tenant->name;
+                    });
+                }
+            } else {
+                $name = $this->argument('name');
+                $tenants->runFor($name, function (TenantContext $tenant) use (&$migratedTenants) {
+                    runInConsole(fn () => $this->info("Migration du tenant: {$tenant->name}"));
+                    Artisan::call('migrate', ['--path' => 'database/migrations/tenants', '--force' => true]);
+                    runInConsole(fn () => $this->line(Artisan::output()));
+
+                    $migratedTenants[] = $tenant->name;
+                });
+            }
+
+            return self::SUCCESS;
+        } catch (\Exception $e) {
+            if ($rollbackOnFail && (\count($migratedTenants) > 0)) {
+                $this->warn('Migration failed. Rolling back...');
+                foreach ($migratedTenants as $tenantName) {
+                    $tenants->runFor($tenantName, function (TenantContext $tenant) {
+                        runInConsole(fn () => $this->info("Rollback du tenant: {$tenant->name}"));
+                        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/tenants', '--force' => true]);
                         runInConsole(fn () => $this->line(Artisan::output()));
                     });
                 }
             }
 
-            return self::SUCCESS;
-        } catch (\Exception $e) {
-            runInConsole(function () use ($e) {
-                $this->error($e->getMessage());
+            runInConsole(fn () => $this->error($e->getMessage()));
 
-                return Command::FAILURE;
-            });
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            return self::FAILURE;
         }
     }
 }
