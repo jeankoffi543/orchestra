@@ -62,6 +62,18 @@ class Installer extends OperaBuilder
             // create master_tenant
             Artisan::call("orchestra:create $master --domain=$domain --driver=$driver --migrate");
 
+            // update route files
+            rollback_catch(
+                function () use ($master, $rollback) {
+                    Tenancy::removeRoutesDefaultContent(Tenancy::getRoutesDefaultContent('web'), base_path("site/$master/routes/web.php"));
+                    $rollback->add(fn () => Tenancy::putRoutesDefaultContent(Tenancy::getRoutesDefaultContent('web'), base_path("site/$master/routes/web.php")));
+
+                    Tenancy::removeRoutesDefaultContent(Tenancy::getRoutesDefaultContent('api'), base_path("site/$master/routes/api.php"));
+                    $rollback->add(fn () => Tenancy::putRoutesDefaultContent(Tenancy::getRoutesDefaultContent('api'), base_path("site/$master/routes/api.php")));
+                },
+                $rollback
+            );
+
             $output->info('Migration de la base de donnée effectuée.');
 
             rollback_catch(
@@ -129,7 +141,7 @@ class Installer extends OperaBuilder
 
             rollback_catch(
                 function () use ($master, $rollback) {
-                    $domain = config('orchestra.master_tenant.domain');
+                    $domain = config('orchestra.tenant.master.domain');
                     $this->removeModuleProviderToAppConfig();
                     $rollback->add(fn () => $this->addModuleProviderToAppConfig());
 
@@ -216,10 +228,11 @@ class Installer extends OperaBuilder
         $content    = \file_get_contents($moduleOrchestra);
 
         $dpattern = "/('domain'\s*=>\s*)('.*?',$)/sm";
-        $npattern = "/('name'\s*=>\s*)('.*?',$)/sm";
+        // $npattern = "/('name'\s*=>\s*)('.*?',$)/sm";
+        $npattern = "/('name'\s*=>\s*)('.*?',$)(.*)/sm";
 
         $content = \preg_replace($dpattern, "$1'$domain',", $content);
-        $content = \preg_replace($npattern, "$1'$name',\n", $content);
+        $content = \preg_replace($npattern, "$1'$name',\n$3", $content);
 
         \file_put_contents($configPath, $content);
 

@@ -28,8 +28,16 @@ class LessTenancy
         rollback_catch(
             function () use ($from, $to, $rollback) {
                 File::copyDirectory($from, "$to/");
-                File::copy("$from/.env.example", "$to/.env");
                 $rollback->add(fn () => File::deleteDirectory($to));
+
+                File::copy("$from/.env.example", "$to/.env");
+                $rollback->add(fn () => File::delete("$to/.env"));
+
+                Tenancy::putRoutesDefaultContent(Tenancy::getRoutesDefaultContent('web'), "$to/routes/web.php");
+                $rollback->add(fn () => Tenancy::removeRoutesDefaultContent(Tenancy::getRoutesDefaultContent('web'), "$to/routes/web.php"));
+
+                Tenancy::putRoutesDefaultContent(Tenancy::getRoutesDefaultContent('api'), "$to/routes/api.php");
+                $rollback->add(fn () => Tenancy::removeRoutesDefaultContent(Tenancy::getRoutesDefaultContent('api'), "$to/routes/api.php"));
             },
             $rollback
         );

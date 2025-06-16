@@ -1,0 +1,3 @@
+if (app('files')->exists($path = base_path('routes/web.php'))) {
+    Route::group([], $path);
+}

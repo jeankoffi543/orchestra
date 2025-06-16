@@ -12,9 +12,3 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
-if (app('files')->exists($path = base_path('routes/api.php'))) {
-    Route::middleware('api')
-        ->prefix('api')
-        ->group($path);
-}

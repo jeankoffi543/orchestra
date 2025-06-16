@@ -85,12 +85,14 @@ class Tenancy
 
             // Generate database credentials
             $credentials                        = generateDatabaseCredentials($name);
-            $credentials['DB_PASSWORD']         = '"' . generatePassword(12) . '"';
+            $credentials['DB_PASSWORD']         = \addslashes(generatePassword(12));
             $credentials['DB_CONNECTION']       = $driver;
             $credentials['DB_HOST']             = '127.0.0.1';
             $credentials['DB_PORT']             = '5432';
             $credentials['APP_URL']             = request()->getScheme() . '://' . $domain;
             $credentials['APP_DEBUG']           = false;
+            $credentials['APP_DOMAIN']          = $domain;
+            $credentials['SESSION_DOMAIN']      = '"${APP_DOMAIN}"';
             $credentials['APP_KEY']             = 'base64:' . \base64_encode(\random_bytes(32));
             $credentials['APP_ENV']             = 'production';
             $credentials['APP_LOCALE']          = 'fr';
@@ -112,6 +114,49 @@ class Tenancy
             LessTenancy::addDomain($name, $domain, $rollback);
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Return the default route content for the given route name.
+     *
+     * @param string $name The name of the route. Can be 'web' or 'api'.
+     * @return string The default route content.
+     */
+    public static function getRoutesDefaultContent(string $name): string
+    {
+        $content = '';
+        switch ($name) {
+            case 'web':
+                $content = \file_get_contents(module_path('.stub/routes/.default.web.stub'));
+                break;
+            case 'api':
+                $content = \file_get_contents(module_path('.stub/routes/.default.api.stub'));
+                break;
+        }
+
+        return $content;
+    }
+
+    /**
+     * Add default route content to the given path.
+     *
+     * This function appends the given content to the specified file path if it exists.
+     *
+     * @param string $content The default route content to add.
+     * @param string $path The path to the file to add the content to.
+     */
+    public static function putRoutesDefaultContent(string $content, string $path): void
+    {
+        if (File::exists($path)) {
+            File::append($path, PHP_EOL . $content);
+        }
+    }
+
+    public static function removeRoutesDefaultContent(string $content, string $path): void
+    {
+        if (File::exists($path)) {
+            File::put($path, \str_replace($content, '', File::get($path)));
         }
     }
 
@@ -598,6 +643,10 @@ class Tenancy
      */
     public static function switchToTenant(?string $name = null): void
     {
+        if (!$name) {
+            abort(404);
+        }
+
         $tenantManager = new TenantManager();
         try {
             $name = parseTenantName($name);
@@ -607,7 +656,7 @@ class Tenancy
             if ($tenantManager instanceof TenantManager) {
                 $tenantManager->rebase($name);
             }
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            throw new \Exception($e->getMessage(), $e->getCode());
         }
     }
 
