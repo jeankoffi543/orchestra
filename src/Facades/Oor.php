@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static void create(array<string, mixed> $data, ?string $driver = 'pgsql', bool $migrate = true)
- * @method static void delete(string $name, ?string $driver = 'pgsql')
- * @method static void update(array<string, mixed> $data, ?string $driver = 'pgsql')
+ * @method static void delete(string $name, ?string $driver = 'pgsql', ?string $domain = '')
+ * @method static void update(array<string, mixed> $data)
  * @method static void switch(string $tenant)
  * @method static void use(string $name, \Closure $callback)
  * @method static void reloadDomain()
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static void switchToCurrent()
  * @method static void useCurrent(\Closure $callback)
  * @method static void initialize()
- * @method static void migrate(array<string, mixed> $credentials, string $name)
+ * @method static void migrate(array<string, mixed> $credentials, string $name, \Kjos\Orchestra\Facades\Concerns\RollbackManager $rollback, bool $exists = true)
  * @method static void restore(string $tenantName, string $driver = 'pgsql', \Illuminate\Console\OutputStyle $console)
  * @method static array<string, string> getTenants()
  * @see \App\Providers\Facades\Orchestra

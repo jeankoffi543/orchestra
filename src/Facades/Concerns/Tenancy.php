@@ -22,36 +22,47 @@ class Tenancy
     protected static string $composerPath;
     protected static string $moduleSitePath;
 
+    /** @var array<string, mixed> */
+    public static array $defaulEnv = [];
+
     public static function init(string $moduleStubPath): void
     {
         self::$sitePath       = getBasePath();
         self::$stubPasth      = getStubPath();
         self::$moduleStubPath = $moduleStubPath;
+
+        self::$defaulEnv['DB_PASSWORD']         = '';
+        self::$defaulEnv['DB_CONNECTION']       = 'mysql';
+        self::$defaulEnv['DB_HOST']             = '127.0.0.1';
+        self::$defaulEnv['DB_PORT']             = '3306';
+        self::$defaulEnv['APP_URL']             = 'http://localhost';
+        self::$defaulEnv['APP_DEBUG']           = true;
+        self::$defaulEnv['APP_KEY']             = '';
+        self::$defaulEnv['APP_ENV']             = 'local';
+        self::$defaulEnv['APP_LOCALE']          = 'fr';
+        self::$defaulEnv['APP_FALLBACK_LOCALE'] = 'fr';
+        self::$defaulEnv['APP_FAKER_LOCALE']    = 'fr_FR';
     }
 
     /**
-     * Create a new tenant with the given data
+     * Create a new tenant with the given data.
      *
-     * @param array<string, mixed> $data
-     * @param string $driver
-     * @param boolean $migrate
+     * This function validates the provided tenant data, creates a new tenant directory with a stub site,
+     * generates database credentials, and optionally migrates the tenant's database schema.
+     * It also links the tenant storage and adds the tenant's domain to the tenants file.
      *
-     * @throws \Exception
+     * @param array<string, mixed> $data An associative array containing tenant data, including 'name' and 'domains'.
+     * @param string|null $driver The database driver to be used, default is 'pgsql'.
+     * @param bool $migrate Whether to migrate the tenant's database schema, default is true.
      *
+     * @throws \Exception If the tenant already exists or if there is an error during the creation process.
      * @return void
      */
     public static function createTenant(array $data, ?string $driver = 'pgsql', bool $migrate = true): void
     {
-        $basePath       = null;
-        $credentials    = null;
-        $name           = null;
-        $moduleStubPath = self::$moduleStubPath;
+        $rollback = new RollbackManager();
 
         try {
-            if (!isset($data['name'], $data['domains'])) {
-                throw new \Exception('name or domain is required', Response::HTTP_BAD_REQUEST);
-            }
-
             // Validate data
             self::validateData($data, [
                 'name'    => ['required', new TenantNameRule()],
@@ -63,77 +74,65 @@ class Tenancy
             $basePath = getBasePath($name);
 
             // stub
-            $stubSite = "$moduleStubPath/.site";
+            $stubSite = module_path('.stub/.site');
 
             // check if tenant already exists
             if (File::exists($basePath)) {
                 throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
             }
 
-            // copy stub
-            File::copyDirectory($stubSite, "$basePath/");
-            if (!File::exists("$basePath/.env.example")) {
-                throw new \Exception('env.example not found', Response::HTTP_INTERNAL_SERVER_ERROR);
-            }
-            File::copy("$basePath/.env.example", "$basePath/.env");
+            LessTenancy::createStub($stubSite, $basePath, $rollback);
 
             // Generate database credentials
-            $credentials                = generateDatabaseCredentials($name);
-            $credentials['DB_PASSWORD'] = generatePassword(12);
+            $credentials                        = generateDatabaseCredentials($name);
+            $credentials['DB_PASSWORD']         = '"' . generatePassword(12) . '"';
+            $credentials['DB_CONNECTION']       = $driver;
+            $credentials['DB_HOST']             = '127.0.0.1';
+            $credentials['DB_PORT']             = '5432';
+            $credentials['APP_URL']             = request()->getScheme() . '://' . $domain;
+            $credentials['APP_DEBUG']           = false;
+            $credentials['APP_KEY']             = 'base64:' . \base64_encode(\random_bytes(32));
+            $credentials['APP_ENV']             = 'production';
+            $credentials['APP_LOCALE']          = 'fr';
+            $credentials['APP_FALLBACK_LOCALE'] = 'fr';
+            $credentials['APP_FAKER_LOCALE']    = 'fr_FR';
 
-            $request = request();
-            $scheme  = $request->getScheme();
+            LessTenancy::addTeantCreatingEnv($credentials, $basePath, $rollback);
 
-            // set env content line by line
-            self::setTenantEnv(
-                [
-                    'DB_CONNECTION'       => 'pgsql',
-                    'DB_HOST'             => '127.0.0.1',
-                    'DB_PORT'             => '5432',
-                    'DB_DATABASE'         => $credentials['DB_DATABASE'],
-                    'DB_USERNAME'         => $credentials['DB_USERNAME'],
-                    'DB_PASSWORD'         => '"' . $credentials['DB_PASSWORD'] . '"',
-                    'APP_URL'             => "$scheme://$domain",
-                    'APP_NAME'            => $name,
-                    'APP_DOMAIN'          => $domain,
-                    'APP_DEBUG'           => 'false',
-                    'APP_KEY'             => 'base64:' . \base64_encode(\random_bytes(32)),
-                    'APP_ENV'             => 'production',
-                    'APP_LOCALE'          => 'fr',
-                    'APP_FALLBACK_LOCALE' => 'fr',
-                    'APP_FAKER_LOCALE'    => 'fr_FR',
-                ],
-                $basePath
-            );
 
             if ($migrate) {
                 // Migrate database
-                self::migrate($credentials, $name);
+                self::migrate($credentials, $name, $rollback, self::checkIfCredentialsExist($credentials));
             }
 
             // Link tenant storage
-            Artisan::call("orchestra:link $name --force");
+            LessTenancy::linkTenant($name, $rollback);
 
             // add $name=$domain to tenants file
-            self::addDomain($name, $domain);
+            LessTenancy::addDomain($name, $domain, $rollback);
         } catch (\Exception $e) {
-            // If tenant already exists do nothing
-            Tenancy::rollback($name, $driver);
             throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
-    public static function rollback(string $tenantName, string $driver = 'pgsql', ?bool $deleteTenant = true): void
+    /**
+     * Delete an existing tenant.
+     *
+     * This function removes the specified tenant by unlinking its storage,
+     * archiving its site directory, and optionally dropping its database.
+     * It also removes the tenant's domain from the tenants file.
+     *
+     * @param string $name The name of the tenant to delete.
+     * @param string|null $driver The database driver to use, default is 'pgsql'.
+     * @param string|null $domain The domain of the tenant to remove from the tenants file.
+     *
+     * @throws \Exception If an error occurs during the deletion process.
+     * @return void
+     */
+    public static function deleteTenant(string $name, ?string $driver = 'pgsql', ?string $domain = ''): void
     {
-        // remove the tenant
-        $deleteTenant && self::deleteTenant($tenantName, $driver, true);
+        $rollback = new RollbackManager();
 
-        // remove the archive
-        TenantArchiver::removeZip($tenantName);
-    }
-
-    public static function deleteTenant(string $name, ?string $driver = 'pgsql', ?bool $rollback = false): void
-    {
         try {
             $name     = parseTenantName($name);
             $basePath = getBasePath($name);
@@ -142,26 +141,99 @@ class Tenancy
             $credentials = parseEnvPath($name);
 
             // unlink tenant storage
-            Artisan::call("orchestra:unlink $name");
+            LessTenancy::unlinkTenant($name, $rollback);
 
             // check if tenant already exists
             if (File::exists($basePath)) {
                 // File::deleteDirectory($basePath);
-                TenantArchiver::archiveTenant($name, $driver);
+                TenantArchiver::archiveTenant($name, $rollback, $driver);
             };
 
-            if (
-                self::checkIfCredentialsExist($credentials) && isset($credentials['DB_DATABASE'], $credentials['DB_USERNAME']) && !$rollback
-            ) {
-                TenantDatabaseManager::dropTenantDatabase($credentials['DB_DATABASE']);
-                TenantDatabaseManager::dropUser($credentials['DB_USERNAME']);
-            }
+            LessTenancy::dropTenantDatabase($credentials, $rollback, self::checkIfCredentialsExist($credentials));
 
             // remove $name=$domain from tenants file
-            self::removeDomain($name);
+            LessTenancy::removeDomain($name, $domain, $rollback);
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Update an existing tenant.
+     *
+     * This function updates the specified tenant by renaming its directory,
+     * updating its environment variables, and optionally updating its domain
+     * in the tenants file.
+     *
+     * @param array<string, mixed> $data An associative array containing the updated tenant data,
+     *                                   including the 'name' of the tenant and any other fields to update.
+     *
+     * @throws \Exception If an error occurs during the update process.
+     * @return void
+     */
+    public static function updateTenant(array $data): void
+    {
+        $rollback = new RollbackManager();
+        try {
+            $name     = parseTenantName($data['name']);
+            $basePath = getBasePath($name);
+            if (File::exists($basePath)) {
+                $newTenantName = parseTenantName($data['by']);
+                $domain        = null;
+
+                $request = request();
+                $scheme  = $request->getScheme();
+
+                // Update tenant env
+                $env = [];
+                if (isset($data['domain'])) {
+                    $domain            = $data['domain'];
+                    $env['APP_URL']    = "$scheme://$domain";
+                    $env['APP_DOMAIN'] = $domain;
+                }
+
+                $env['APP_NAME'] = $newTenantName;
+
+                self::setTenantEnv(
+                    $env,
+                    $basePath
+                );
+
+
+                // Rename tenant directory
+                LessTenancy::renameTenant($basePath, getBasePath($newTenantName), $rollback);
+
+                LessTenancy::unlinkTenant($name, $rollback);
+                LessTenancy::linkTenant($newTenantName, $rollback);
+            } else {
+                throw new \Exception('Tenant not found', Response::HTTP_NOT_FOUND);
+            }
+
+            // remove $name=$domain from tenants file
+            LessTenancy::updateDomain($name, $newTenantName, $domain, $rollback);
+        } catch (\Exception $e) {
+            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Restores a tenant that was previously backed up and archived.
+     *
+     * This function restores a tenant by restoring its database and files.
+     * It also adds the tenant's domain to the list of domains.
+     *
+     * @param string $tenantName The name of the tenant to restore.
+     * @param string $driver The database driver to use for the tenant's database.
+     * @param OutputStyle $console An optional console object to use for output.
+     * @return void
+     */
+    public static function restore(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): void
+    {
+        $rollback   = new RollbackManager();
+        $tenantName = parseTenantName($tenantName);
+        TenantArchiver::restoreTenant($tenantName, $rollback, $driver, $console);
+        $domain = \parse_ini_file(getEnvPath($tenantName))['APP_DOMAIN'];
+        self::addDomain($tenantName, $domain);
     }
 
     /**
@@ -188,7 +260,7 @@ class Tenancy
      * in the credentials array. It returns true if both the database and
      * user exist, otherwise it returns false.
      *
-     * @param array<string, string> $credentials The database credentials with
+     * @param array<string, mixed> $credentials The database credentials with
      *                                           'DB_DATABASE' and 'DB_USERNAME' keys.
      *
      * @return bool True if both the user and database exist, otherwise false.
@@ -508,84 +580,13 @@ class Tenancy
      * @param string $name The name of the tenant.
      * @return void
      */
-    public static function migrate(array $credentials, string $name): void
+    public static function migrate(array $credentials, string $name, RollbackManager $rollback, bool $exists = true): void
     {
         // Create tenant database and user
-        TenantDatabaseManager::createTenant($credentials['DB_DATABASE'], $credentials['DB_USERNAME'], $credentials['DB_PASSWORD']);
+        LessTenancy::createTenantDatabase($credentials, $rollback, $exists);
 
         // Migrate tenant database
         Artisan::call("orchestra:migrate $name");
-    }
-
-    /**
-     * Restores a tenant that was previously backed up and archived.
-     *
-     * This function restores a tenant by restoring its database and files.
-     * It also adds the tenant's domain to the list of domains.
-     *
-     * @param string $tenantName The name of the tenant to restore.
-     * @param string $driver The database driver to use for the tenant's database.
-     * @param OutputStyle $console An optional console object to use for output.
-     * @return void
-     */
-    public static function restore(string $tenantName, string $driver = 'pgsql', ?OutputStyle $console = null): void
-    {
-        $tenantName = parseTenantName($tenantName);
-        TenantArchiver::restoreTenant($tenantName, $driver, $console);
-        $domain = \parse_ini_file(getEnvPath($tenantName))['APP_DOMAIN'];
-        self::addDomain($tenantName, $domain);
-    }
-
-    /**
-     * Update a tenant by changing its name and/or domain.
-     *
-     * @param array<string, mixed> $data The data to update the tenant with.
-     * @param string $driver The database driver to use.
-     * @return void
-     *
-     * @throws \Exception If the tenant is not found or if there is a problem while updating it.
-     */
-    public static function updateTenant(array $data, ?string $driver = 'pgsql'): void
-    {
-        try {
-            $name     = parseTenantName($data['name']);
-            $basePath = getBasePath($name);
-            if (File::exists($basePath)) {
-                $newTenantName = parseTenantName($data['by']);
-                $domain        = null;
-
-                $request = request();
-                $scheme  = $request->getScheme();
-
-                // Update tenant env
-                $env = [];
-                if (isset($data['domain'])) {
-                    $domain            = $data['domain'];
-                    $env['APP_URL']    = "$scheme://$domain";
-                    $env['APP_DOMAIN'] = $domain;
-                }
-
-                $env['APP_NAME'] = $newTenantName;
-
-                self::setTenantEnv(
-                    $env,
-                    $basePath
-                );
-
-
-                // Rename tenant directory
-                File::move($basePath, getBasePath($newTenantName));
-                Artisan::call("orchestra:unlink $name");
-                Artisan::call("orchestra:link $newTenantName --force");
-            } else {
-                throw new \Exception('Tenant not found', Response::HTTP_NOT_FOUND);
-            }
-
-            // remove $name=$domain from tenants file
-            self::updateDomain($name, $newTenantName, $domain);
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
     }
 
     /**

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Kjos\Orchestra\Facades\Concerns\RollbackManager;
 
 if (!\function_exists('generatePassword')) {
     /**
@@ -374,5 +375,26 @@ if (!\function_exists('getTeantPathIfExists')) {
         }
 
         return null;
+    }
+}
+
+if (!\function_exists('rollback_catch')) {
+    /**
+      * Runs a callback and catches any exceptions thrown.
+      * If an exception is caught, it runs the rollback and re-throws the exception.
+      *
+      * @param Closure $callback The callback to run.
+      * @param RollbackManager $rollback The rollback manager to run if an exception is caught.
+      * @return void
+      * @throws Exception If an exception is caught.
+      */
+    function rollback_catch(Closure $callback, RollbackManager $rollback): void
+    {
+        try {
+            $callback();
+        } catch (\Exception $e) {
+            $rollback->run();
+            throw new \Exception($e->getMessage());
+        }
     }
 }

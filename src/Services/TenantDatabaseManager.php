@@ -265,22 +265,36 @@ class TenantDatabaseManager
     }
 
     /**
-     * Creates a new tenant with the given database name, username and password.
+     * Creates a tenant by creating a database user, a database, and granting the user all privileges on the database.
      *
-     * This function will create a new database user, a new database and grant the user all privileges on the database.
-     *
-     * @param string $dbname The name of the database to create.
-     * @param string $username The username for the new user.
-     * @param string $password The password for the new user.
+     * @param array<string, mixed> $credentials An associative array containing the credentials for the tenant, including 'DB_DATABASE', 'DB_USERNAME', and 'DB_PASSWORD'.
+     * @param bool $exists Whether the tenant already exists or not. If true, the method will skip creating the user and database.
      *
      * @return void
      */
-    public static function createTenant(string $dbname, string $username, string $password): void
+    public static function createTenant(array $credentials, bool $exists = false): void
     {
-        self::createUser($username, $password);
+        if (!$exists && isset($credentials['DB_DATABASE']) && isset($credentials['DB_USERNAME']) && isset($credentials['DB_PASSWORD'])) {
+            self::createUser($credentials['DB_USERNAME'], $credentials['DB_PASSWORD']);
+            self::createDatabase($credentials['DB_DATABASE'], $credentials['DB_USERNAME']);
+            self::grantPrivileges($credentials['DB_DATABASE'], $credentials['DB_USERNAME']);
+        }
+    }
 
-        self::createDatabase($dbname, $username);
-        self::grantPrivileges($dbname, $username);
+    /**
+     * Drop a tenant by removing its database and user.
+     *
+     * @param array<string, mixed> $credentials An associative array containing the credentials for the tenant, including 'DB_DATABASE' and 'DB_USERNAME'.
+     * @param bool $exists Whether the tenant already exists or not. If true, the method will proceed to drop the user and database.
+     *
+     * @return void
+     */
+    public static function dropTenant(array $credentials, bool $exists = true): void
+    {
+        if ($exists && isset($credentials['DB_DATABASE'], $credentials['DB_USERNAME'])) {
+            TenantDatabaseManager::dropTenantDatabase($credentials['DB_DATABASE']);
+            TenantDatabaseManager::dropUser($credentials['DB_USERNAME']);
+        }
     }
 
     /**

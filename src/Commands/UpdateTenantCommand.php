@@ -72,8 +72,7 @@ class UpdateTenantCommand extends Command
                     'name'   => $name,
                     'by'     => $by,
                     'domain' => $domain,
-                ],
-                $driver
+                ]
             );
 
             return Command::SUCCESS;

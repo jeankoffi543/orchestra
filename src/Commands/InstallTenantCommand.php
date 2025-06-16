@@ -5,6 +5,7 @@ namespace Kjos\Orchestra\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Concerns\Installer;
+use Kjos\Orchestra\Facades\Concerns\RollbackManager;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'orchestra:install')]
@@ -40,6 +41,8 @@ class InstallTenantCommand extends Command
      */
     public function handle(): int
     {
+        $rollback = new RollbackManager();
+
         try {
             if (! $master = $this->argument('master')) {
                 throw new \Exception('master tenant name is required', Response::HTTP_BAD_REQUEST);
@@ -54,7 +57,7 @@ class InstallTenantCommand extends Command
             runInConsole(fn () => $this->info('Installing Orchestra...'));
 
             // directory initialisation and master tenant creation
-            $installer->prepareInstallation($master, $domain, $driver, $this->output);
+            $installer->prepareInstallation($master, $domain, $driver, $rollback, $this->output);
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
