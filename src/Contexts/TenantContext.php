@@ -36,7 +36,7 @@ class TenantContext
      */
     public function apply(): void
     {
-        // Remplacer la config en mémoire, pas l'env global
+        // Remplacer la config en mémoire, pas l'env du tenant courant
         foreach ($this->config as $key => $value) {
             config()->set($key, $value);
         }

@@ -39,4 +39,6 @@ return [
    ],
 
    'providers' => [],
+   'virtual_hosts_config_prefix' => 'orchestra-', //exemple: orchestra-domain.com.conf
+   'cron_log_path' => 'orchestra-deployer.log', //cron log will be save in storage/logs/orchestra-deployer.log
 ];

@@ -181,6 +181,8 @@ class LessTenancy
     {
         rollback_catch(
             function () use ($name, $rollback) {
+                // Create tenant directory
+                createDirectorySecurely(public_path('storage/tenants'));
                 Artisan::call("orchestra:link $name --force");
                 $rollback->add(fn () => Artisan::call("orchestra:unlink $name"));
             },
@@ -230,7 +232,7 @@ class LessTenancy
      *
      * @throws \Exception If an error occurs during the setting of environment variables.
      */
-    public static function addTeantCreatingEnv(array $envs, string $path, RollbackManager $rollback): void
+    public static function addTenantCreatingEnv(array $envs, string $path, RollbackManager $rollback): void
     {
         rollback_catch(
             function () use ($envs, $path, $rollback) {

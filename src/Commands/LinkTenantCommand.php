@@ -3,8 +3,6 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\File;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'orchestra:link')]
@@ -43,34 +41,18 @@ class LinkTenantCommand extends Command
         try {
             // Récupérer les arguments et options correctement
             $tenant = $this->argument('tenant'); // par exemple
-            $target = getBasePath("$tenant/storage/app/public");
+            $target = base_path("site/$tenant/storage/app/public");
+            $link   = public_path("storage/tenants/{$tenant}");
 
-            $link = public_path("storage/tenants/{$tenant}");
-
-            if (!File::exists($target)) {
-                throw new \Exception("Le dossier de stockage du tenant n'existe pas.");
-            }
-            if (File::exists($link)) {
-                if ($this->option('force')) {
-                    \unlink($link);
-                    \symlink($target, $link);
-                    runInConsole(fn () => $this->info("Lien symbolique recréé : {$link} → {$target}"));
-                } else {
-                    throw new \Exception("Le lien existe déjà : {$link} (utilise --force pour le recréer)");
-                }
-            } else {
-                \symlink($target, $link);
-                runInConsole(fn () => $this->info("Lien symbolique créé : {$link} → {$target}"));
-            }
+            forceSymlink($target, $link, $this->option('force'));
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
             runInConsole(function () use ($e) {
                 $this->error($e->getMessage());
-
-                return Command::FAILURE;
             });
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+
+            return Command::FAILURE;
         }
     }
 }

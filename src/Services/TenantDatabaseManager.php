@@ -4,6 +4,7 @@ namespace Kjos\Orchestra\Services;
 
 use Exception;
 use Illuminate\Console\OutputStyle;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 use Kjos\Orchestra\Enums\ShellContextEnum;
 use Kjos\Orchestra\Rules\DataBaseNameRule;
@@ -381,45 +382,50 @@ class TenantDatabaseManager
         $envPath       = checkFileExists("{$tenantEnvPath}/.env");
         $masterEnvPath = checkFileExists(base_path('.env'));
 
-        $env       = \parse_ini_file($envPath);
-        $masterEnv = \parse_ini_file($masterEnvPath);
+        $env       = [];
+        $masterEnv = [];
+        if (File::exists($envPath) && File::exists($masterEnvPath)) {
+            $env       = \parse_ini_file($envPath);
+            $masterEnv = \parse_ini_file($masterEnvPath);
+        }
+
 
         $dbName = $env['DB_DATABASE']       ?? null; // database name of the current tenant not the for global user with necessary permissions
         $user   = $masterEnv['DB_USERNAME'] ?? null; //global user with necessaries permissions
         $pass   = $masterEnv['DB_PASSWORD'] ?? null; //global user with necessaries permissions
 
         if (!$dbName || !$user || !$pass) {
-            throw new Exception("DB_DATABASE, DB_USERNAME ou DB_PASSWORD manquant dans l'env");
-        }
-
-        $driver = $driver ?? getDriver($masterEnv);
-
-        // 4. Dump de la base de données
-        $dumpPath = "{$destination}/{$dbName}.sql";
-        if ($driver === 'pgsql') {
-            $cmd = \sprintf(
-                'PGPASSWORD=%s pg_dump -U %s -h 127.0.0.1 -F p %s > %s',
-                safeShell($pass, ShellContextEnum::ENV()),
-                safeShell($user, ShellContextEnum::ARG()),
-                safeShell($dbName, ShellContextEnum::ARG()),
-                safeShell($dumpPath, ShellContextEnum::FILE()),
-            );
-        } elseif ($driver === 'mysql') {
-            $cmd = \sprintf(
-                'mysqldump -u%s -p%s %s > %s',
-                safeShell($user, ShellContextEnum::ENV()),
-                safeShell($pass, ShellContextEnum::ENV()),
-                safeShell($dbName, ShellContextEnum::ARG()),
-                safeShell($dumpPath, ShellContextEnum::FILE()),
-            );
+            // throw new Exception("DB_DATABASE, DB_USERNAME ou DB_PASSWORD manquant dans l'env");
         } else {
-            throw new Exception("Driver non supporté : $driver");
-        }
+            $driver = $driver ?? getDriver($masterEnv);
 
-        \exec($cmd, $output, $exitCode);
-        runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
-        if ($exitCode !== 0) {
-            runInConsole(fn () => $console?->writeln("<error>Échec du dump de la base de données pour $dbName. Vérifiez vos informations de connexion ou soit la base de donnée n'existe pas</error>"));
+            // 4. Dump de la base de données
+            $dumpPath = "{$destination}/{$dbName}.sql";
+            if ($driver === 'pgsql') {
+                $cmd = \sprintf(
+                    'PGPASSWORD=%s pg_dump -U %s -h 127.0.0.1 -F p %s > %s',
+                    safeShell($pass, ShellContextEnum::ENV()),
+                    safeShell($user, ShellContextEnum::ARG()),
+                    safeShell($dbName, ShellContextEnum::ARG()),
+                    safeShell($dumpPath, ShellContextEnum::FILE()),
+                );
+            } elseif ($driver === 'mysql') {
+                $cmd = \sprintf(
+                    'mysqldump -u%s -p%s %s > %s',
+                    safeShell($user, ShellContextEnum::ENV()),
+                    safeShell($pass, ShellContextEnum::ENV()),
+                    safeShell($dbName, ShellContextEnum::ARG()),
+                    safeShell($dumpPath, ShellContextEnum::FILE()),
+                );
+            } else {
+                throw new Exception("Driver non supporté : $driver");
+            }
+
+            \exec($cmd, $output, $exitCode);
+            runInConsole(fn () => $console?->writeln(\implode(PHP_EOL, $output)));
+            if ($exitCode !== 0) {
+                runInConsole(fn () => $console?->writeln("<error>Échec du dump de la base de données pour $dbName. Vérifiez vos informations de connexion ou soit la base de donnée n'existe pas</error>"));
+            }
         }
     }
 
@@ -436,11 +442,13 @@ class TenantDatabaseManager
     public static function import(string $tenantEnvPath, string $extractPath, ?OutputStyle $console, ?string $driver = null): void
     {
         // 3. Charger l'env du tenant
-        $envPath       = checkFileExists("{$tenantEnvPath}");
-        $masterEnvPath = checkFileExists(base_path('.env'));
+        $env       = [];
+        $masterEnv = [];
+        if (File::exists($tenantEnvPath) && File::exists($masterEnvPath = base_path('.env'))) {
+            $env       = \parse_ini_file($tenantEnvPath);
+            $masterEnv = \parse_ini_file($masterEnvPath);
+        }
 
-        $env       = \parse_ini_file($envPath);
-        $masterEnv = \parse_ini_file($masterEnvPath);
 
         $dbName = $env['DB_DATABASE']       ?? null; // database name of the current tenant not the for global user with necessary permissions
         $user   = $masterEnv['DB_USERNAME'] ?? null; //global user with necessaries permissions

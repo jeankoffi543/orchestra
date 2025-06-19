@@ -107,7 +107,7 @@ if (!\function_exists('getEnvPath')) {
      * @param string|null $name The name of the tenant.
      * @return string The path of the .env file.
      */
-    function getEnvPath(?string $name = null): string
+    function getEnvPath(?string $name = null): ?string
     {
         return $name ? checkFileExists(base_path("site/$name/.env")) : checkFileExists(base_path('.env'));
     }
@@ -126,6 +126,9 @@ if (!\function_exists('parseEnvPath')) {
     function parseEnvPath(?string $name = null): array
     {
         $env = $name ? getEnvPath("$name") : getEnvPath();
+        if (!File::isFile($env)) {
+            return [];
+        }
 
         return \parse_ini_file($env);
     }
@@ -148,14 +151,41 @@ if (!\function_exists('getStubPath')) {
 
 if (!\function_exists('createDirectorySecurely')) {
     /**
-     * Cr e un dossier s r s ment.
+     * Creates a directory securely if it does not already exist.
      *
-     * @param string $path Chemin du dossier   cr er.
-     * @param int|null $recursively Niveau de r cursivit .
+     * If the directory already exists, this function does nothing.
+     * If the directory does not exist, it is created with the permissions 0755.
+     *
+     * @param string $path The path to the directory to create.
+     * @param bool $recursively Whether or not to create the directory recursively.
+     *                          Defaults to true.
+     *
+     * @return void
      */
-    function createDirectorySecurely(string $path, ?int $recursively = null): void
+    function createDirectorySecurely(string $path, ?bool $recursively = true): void
     {
-        File::ensureDirectoryExists($path, $recursively);
+        File::ensureDirectoryExists($path, 0755, $recursively);
+    }
+}
+
+if (!\function_exists('createDirectoryIfNotExists')) {
+    /**
+     * Creates a directory if it does not already exist.
+     *
+     * This function checks if a directory exists at the given path.
+     * If the directory does not exist, it creates a new directory.
+     *
+     * @param string $path The path where the directory should be created.
+     *
+     * @return void
+     */
+
+    function createDirectoryIfNotExists(string $path): void
+    {
+        if (File::exists($path)) {
+            return;
+        }
+        File::makeDirectory($path, 0755, true);
     }
 }
 
@@ -172,13 +202,9 @@ if (!\function_exists('moveDirectorySecurely')) {
      * @return void
      */
 
-    function moveDirectorySecurely(string $from, string $to, ?bool $overwrite = false): void
+    function moveDirectorySecurely(string $from, string $to, ?bool $overwrite = true): void
     {
-        if (File::exists($from)) {
-            File::moveDirectory($from, $to, $overwrite);
-        } else {
-            throw new Exception("'$from' existe déjà.");
-        }
+        File::moveDirectory($from, $to, $overwrite);
     }
 }
 
@@ -234,10 +260,10 @@ if (!\function_exists('getTenantPathSecurely')) {
          * @throws Exception If the file does not exist at the given path.
          */
 
-        function checkFileExists(string $path): string
+        function checkFileExists(string $path): ?string
         {
             if (!File::exists($path)) {
-                throw new Exception("File does not exist: $path");
+                return null;
             }
 
             return $path;
@@ -274,7 +300,7 @@ if (!\function_exists('getTenantPathSecurely')) {
         {
             if (\is_array($env) && \array_key_exists('DB_CONNECTION', $env)) {
                 return $env['DB_CONNECTION'];
-            } elseif (File::isFile(checkFileExists($env))) {
+            } elseif (File::isFile($env)) {
                 $env = \parse_ini_file($env);
 
                 return $env['DB_CONNECTION'];
@@ -380,14 +406,14 @@ if (!\function_exists('getTeantPathIfExists')) {
 
 if (!\function_exists('rollback_catch')) {
     /**
-      * Runs a callback and catches any exceptions thrown.
-      * If an exception is caught, it runs the rollback and re-throws the exception.
-      *
-      * @param Closure $callback The callback to run.
-      * @param RollbackManager $rollback The rollback manager to run if an exception is caught.
-      * @return void
-      * @throws Exception If an exception is caught.
-      */
+     * Runs a callback and catches any exceptions thrown.
+     * If an exception is caught, it runs the rollback and re-throws the exception.
+     *
+     * @param Closure $callback The callback to run.
+     * @param RollbackManager $rollback The rollback manager to run if an exception is caught.
+     * @return void
+     * @throws Exception If an exception is caught.
+     */
     function rollback_catch(Closure $callback, RollbackManager $rollback): void
     {
         try {
@@ -396,5 +422,42 @@ if (!\function_exists('rollback_catch')) {
             $rollback->run();
             throw new \Exception($e->getMessage());
         }
+    }
+}
+
+if (!\function_exists('forceSymlink')) {
+    /**
+     * Creates a symbolic link between the target and the link.
+     * If the link already exists, it will be overwritten if $force is true.
+     * If the link does not exist, it will be created.
+     *
+     * @param string $target The target of the symbolic link.
+     * @param string $link The path where the symbolic link will be created.
+     * @param bool $force If true, the link will be overwritten if it already exists.
+     * @return void
+     */
+    function forceSymlink(string $target, string $link, bool $force = false): void
+    {
+        if (File::exists($link)) {
+            if ($force) {
+                \unlink($link);
+                \symlink($target, $link);
+            }
+        } else {
+            \symlink($target, $link);
+        }
+    }
+}
+
+/**
+ * Deletes a symbolic link if it exists.
+ *
+ * @param string $link The path to the symbolic link to delete.
+ * @return void
+ */
+function unlinSymlink(string $link): void
+{
+    if (File::exists($link)) {
+        \unlink($link);
     }
 }

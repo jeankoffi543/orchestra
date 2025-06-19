@@ -3,8 +3,6 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\File;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'orchestra:unlink')]
@@ -46,19 +44,16 @@ class UnlinkTenantCommand extends Command
 
             $unlink = public_path("storage/tenants/{$tenant}");
 
-            if (File::exists($unlink)) {
-                \unlink($unlink);
-            }
+            unlinSymlink($unlink);
 
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
             runInConsole(function () use ($e) {
                 $this->error($e->getMessage());
-
-                return Command::FAILURE;
             });
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+
+            return Command::FAILURE;
         }
     }
 }

@@ -59,6 +59,13 @@ class InstallTenantCommand extends Command
             // directory initialisation and master tenant creation
             $installer->prepareInstallation(parseTenantName($master), $domain, $driver, $rollback, $this->output);
 
+            // run deployer
+            $this->call('orchestra:create:deployer');
+
+            $this->call('schedule:clear-cache');
+
+            runInConsole(fn () => $this->info('Installation complete'));
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
             runInConsole(function () use ($e) {

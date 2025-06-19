@@ -99,7 +99,7 @@ class Tenancy
             $credentials['APP_FALLBACK_LOCALE'] = 'fr';
             $credentials['APP_FAKER_LOCALE']    = 'fr_FR';
 
-            LessTenancy::addTeantCreatingEnv($credentials, $basePath, $rollback);
+            LessTenancy::addTenantCreatingEnv($credentials, $basePath, $rollback);
 
 
             if ($migrate) {
@@ -277,7 +277,12 @@ class Tenancy
         $rollback   = new RollbackManager();
         $tenantName = parseTenantName($tenantName);
         TenantArchiver::restoreTenant($tenantName, $rollback, $driver, $console);
-        $domain = \parse_ini_file(getEnvPath($tenantName))['APP_DOMAIN'];
+        $domain = [];
+        if (File::exists($env = base_path("site/$tenantName/.env"))) {
+            $env    = \parse_ini_file($env);
+            $domain = $env['APP_DOMAIN'];
+        }
+
         self::addDomain($tenantName, $domain);
     }
 
@@ -495,8 +500,10 @@ class Tenancy
     public static function removeDomain(string $name): void
     {
         $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = \parse_ini_file($tenantsFile);
-
+        $tenants     = [];
+        if (File::exists($tenantsFile)) {
+            $tenants = \parse_ini_file($tenantsFile);
+        }
         foreach ($tenants as $key => $value) {
             if ($key === $name) {
                 unset($tenants[$key]);
@@ -536,9 +543,33 @@ class Tenancy
     public static function getDomain(string $name): ?string
     {
         $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = \parse_ini_file($tenantsFile);
+        $tenants     = [];
+        if (File::exists($tenantsFile)) {
+            $tenants = \parse_ini_file($tenantsFile);
+        }
 
         return $tenants[$name] ?? null;
+    }
+
+    /**
+     * Retrieve all domains from the tenants configuration file.
+     *
+     * This function reads the tenants configuration file and returns an
+     * associative array where the keys are tenant names and the values
+     * are their corresponding domains. If the file does not exist, it
+     * returns an empty array.
+     *
+     * @return array<string, string>|null An associative array of tenant names and domains, or null if the tenants file does not exist.
+     */
+    public static function getDomains(): ?array
+    {
+        $tenantsFile = getBasePath() . '/.tenants';
+        $tenants     = [];
+        if (File::exists($tenantsFile)) {
+            $tenants = \parse_ini_file($tenantsFile);
+        }
+
+        return $tenants;
     }
 
     /**
@@ -549,7 +580,10 @@ class Tenancy
     public static function getTenants(): array
     {
         $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = \parse_ini_file($tenantsFile);
+        $tenants     = [];
+        if (File::exists($tenantsFile)) {
+            $tenants = \parse_ini_file($tenantsFile);
+        }
 
         return $tenants;
     }
@@ -569,7 +603,11 @@ class Tenancy
     public static function updateDomain(string $name, string $value, ?string $domain = null): void
     {
         $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = \parse_ini_file($tenantsFile);
+        $tenants     = [];
+        if (File::exists($tenantsFile)) {
+            $tenants = \parse_ini_file($tenantsFile);
+        }
+
         if ($domain) {
             $tenants[$name] = $domain;
         }

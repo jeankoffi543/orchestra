@@ -73,6 +73,10 @@ class CreateTenantCommand extends Command
                 'domains' => $domain,
             ], $driver, $migrate);
 
+            $this->call('schedule:clear-cache');
+
+            runInConsole(fn () => $this->info('Tenant created successfully.'));
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
             runInConsole(function () use ($e) {

@@ -30,7 +30,7 @@ class TenantArchiver
      *
      * @throws Exception If any error occurs during the archiving process.
      */
-    public static function archiveTenant(string $tenantName, RollbackManager $rollback, string $driver = 'pgsql', ?OutputStyle $console = null): string
+    public static function archiveTenant(string $tenantName, RollbackManager $rollback, string $driver = 'pgsql', ?OutputStyle $console = null): ?string
     {
         try {
             $timestamp   = now()->format('Ymd_His');
@@ -39,36 +39,42 @@ class TenantArchiver
             // 1. Créer le dossier
             rollback_catch(
                 function () use ($archiveBase, $rollback) {
-                    createDirectorySecurely($archiveBase);
+                    createDirectoryIfNotExists($archiveBase);
+
                     $rollback->add(fn () => removeFileSecurely($archiveBase));
                 },
                 $rollback
             );
 
+
+
             // 2. Déplacer le dossier site
-            $sitePath         = checkFileExists(getBasePath($tenantName));
             $archivedSitePath = "{$archiveBase}/site";
-
-            rollback_catch(
-                function () use ($archivedSitePath, $sitePath, $rollback) {
-                    moveDirectorySecurely($sitePath, $archivedSitePath);
-                    $rollback->add(fn () => moveDirectorySecurely($archivedSitePath, $sitePath));
-                },
-                $rollback
-            );
-
+            $sitePath         = checkFileExists(getBasePath($tenantName));
+            if ($sitePath) {
+                rollback_catch(
+                    function () use ($archivedSitePath, $sitePath, $rollback) {
+                        moveDirectorySecurely($sitePath, $archivedSitePath);
+                        $rollback->add(fn () => moveDirectorySecurely($archivedSitePath, $sitePath));
+                    },
+                    $rollback
+                );
+            }
 
             // 3. dump data base
             $envPath = checkFileExists("{$archivedSitePath}");
-            rollback_catch(
-                function () use ($envPath, $archiveBase, $console, $driver, $rollback) {
-                    TenantDatabaseManager::dump($envPath, $archiveBase, $console, $driver);
-                    $rollback->add(fn () => TenantDatabaseManager::import($envPath, $archiveBase, $console, $driver));
-                },
-                $rollback
-            );
+            if ($envPath) {
+                rollback_catch(
+                    function () use ($envPath, $archiveBase, $console, $driver, $rollback) {
+                        TenantDatabaseManager::dump($envPath, $archiveBase, $console, $driver);
+                        $rollback->add(fn () => TenantDatabaseManager::import($envPath, $archiveBase, $console, $driver));
+                    },
+                    $rollback
+                );
+            }
 
             // 4. Création du zip
+            $zip = null;
             rollback_catch(
                 function () use ($archiveBase, $console, &$zip, $rollback) {
                     $zip = self::zip($archiveBase, $console);
