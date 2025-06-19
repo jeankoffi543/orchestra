@@ -2,6 +2,7 @@
 
 namespace Kjos\Orchestra;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Kjos\Orchestra\Contexts\TenantManager;
 
@@ -10,6 +11,11 @@ class OrchestraServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Load routes, views, migrations, etc.
+        $schedule = $this->app->make(Schedule::class);
+        $schedule->command('orchestra:virtualhost:scanner')
+        ->everySecond()
+        ->withoutOverlapping(5);
+        // $schedule->command('orchestra:reload-domain')->everyMinute();
     }
 
     public function register(): void
@@ -27,6 +33,11 @@ class OrchestraServiceProvider extends ServiceProvider
             \Kjos\Orchestra\Commands\RemoveAutoloadNamespaceCommand::class,
             \Kjos\Orchestra\Commands\UninstallTenantCommand::class,
             \Kjos\Orchestra\Commands\RestoreTenantCommand::class,
+            \Kjos\Orchestra\Commands\CreateDeployerCommand::class,
+            \Kjos\Orchestra\Commands\MakeVirtualHostCommand::class,
+            \Kjos\Orchestra\Commands\RemoveDeployerCommand::class,
+            \Kjos\Orchestra\Commands\MakeVirtualHostScanCommand::class,
+            \Kjos\Orchestra\Commands\RemoveVirtualHostsCommand::class,
         ]);
         //Register facade
         $this->app->singleton('oor', function ($app) {

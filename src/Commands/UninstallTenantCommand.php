@@ -30,7 +30,7 @@ class UninstallTenantCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'orchestra:uninstall {master} {--driver= : master tenant database driver}';
+    protected $signature = 'orchestra:uninstall {name : master tenant name} {--driver= : master tenant database driver}';
 
     /**
      * Execute the console command.
@@ -45,16 +45,21 @@ class UninstallTenantCommand extends Command
         $rollback = new RollbackManager();
 
         try {
-            if (! $master = $this->argument('master')) {
-                throw new \Exception('master tenant name is required', Response::HTTP_BAD_REQUEST);
-            }
-
             $installer = new Installer();
             runInConsole(fn () => $this->info('Uninstalling Orchestra...'));
             // directory initialisation
             $driver = $this->option('driver');
+            $driver = $this->option('driver');
+            $master = $this->argument('name');
             $driver = $driver ?? getDriver(base_path('.env'));
             $installer->prepareUnInstallation($master, $driver, $rollback, $this->output);
+
+            // remove deployer
+            $this->call('orchestra:virtualhosts:remove');
+
+            $this->call('orchestra:remove:deployer');
+
+            $this->call('schedule:clear-cache');
 
             return Command::SUCCESS;
         } catch (\Exception $e) {

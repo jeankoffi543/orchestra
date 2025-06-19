@@ -104,8 +104,6 @@ class Installer extends OperaBuilder
                 $rollback
             );
 
-            $output && runInConsole(fn () => $output->info('Installation complete'));
-
             // format code
             \exec('./vendor/bin/pint ' . $this->getPintPaths(), $output, $status);
         } catch (\Exception $e) {
@@ -125,23 +123,32 @@ class Installer extends OperaBuilder
      *
      * @throws \Exception If there is a problem while uninstalling the tenant.
      */
-    public function prepareUnInstallation(string $master, string $driver, RollbackManager $rollback, ?OutputStyle $output): void
+    public function prepareUnInstallation(?string $master, string $driver, RollbackManager $rollback, ?OutputStyle $output): void
     {
         try {
-            Tenancy::validateData(
-                [
-                    'master' => $master,
-                ],
-                [
-                    'master' => ['required', new TenantNameRule()],
-                ]
-            );
+            $domain = config('orchestra.master.domain');
+            $master = $master ?? config('orchestra.master.name');
+
+            if (! $domain && ! $master) {
+                $output && runInConsole(fn () => $output->error('config file not found, create it before uninstalling'));
+                $output && runInConsole(fn () => $output->writeln('name it orchestra.master.name and orchestra.master.domain'));
+                $output && runInConsole(fn () => $output->writeln('peraps, it is already uninstalled'));
+
+                return;
+            }
+            $master = parseTenantName($master);
+
+            if (! File::exists(base_path("site/$master"))) {
+                $output && runInConsole(fn () => $output->info('Already uninstalled'));
+
+                return;
+            }
 
             Artisan::call("orchestra:delete $master --driver=$driver");
 
             rollback_catch(
                 function () use ($master, $rollback) {
-                    $domain = config('orchestra.tenant.master.domain');
+                    $domain = config('orchestra.master.domain');
                     $this->removeModuleProviderToAppConfig();
                     $rollback->add(fn () => $this->addModuleProviderToAppConfig());
 

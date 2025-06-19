@@ -2,6 +2,8 @@
 
 namespace Kjos\Orchestra\Contexts;
 
+use Illuminate\Support\Facades\File;
+
 class TenantManager
 {
     protected ?TenantContext $current = null;
@@ -19,8 +21,11 @@ class TenantManager
      */
     public function switchTo(string $tenant): void
     {
+        $env = [];
+        if (File::exists($env = base_path("site/{$tenant}/.env"))) {
+            $env = \parse_ini_file($env);
+        }
         // Lire .env spécifique sans toucher à $_ENV
-        $env = \parse_ini_file(base_path("site/{$tenant}/.env"));
 
         // Construire la config isolée
         $config = [
@@ -46,7 +51,10 @@ class TenantManager
      */
     public function rebase(?string $tenant = null): void
     {
-        $env    = \parse_ini_file(base_path('.env'));
+        $env = [];
+        if (File::exists($env = base_path('.env'))) {
+            $env = \parse_ini_file($env);
+        }
         $config = [
             'database.connections.pgsql.database' => $env['DB_DATABASE'] ?? 'forge',
             'database.connections.pgsql.username' => $env['DB_USERNAME'] ?? 'forge',
