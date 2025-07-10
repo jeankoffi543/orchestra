@@ -4,6 +4,7 @@ namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 
 class AddAutoloadNamespaceCommand extends Command
 {
@@ -22,6 +23,7 @@ class AddAutoloadNamespaceCommand extends Command
         try {
             $tenant       = $this->argument('tenant');
             $composerPath = base_path('composer.json');
+            $tenantStudy  = Str::studly($tenant);
 
             if (!\file_exists($composerPath)) {
                 runInConsole(fn () => $this->error('composer.json introuvable.'));
@@ -36,9 +38,9 @@ class AddAutoloadNamespaceCommand extends Command
 
             // Ajouter les entrées spécifiques
             $autoloads = [
-                "Site\\$tenant\\App\\"                 => "site/$tenant/app/",
-                "Site\\$tenant\\Database\\Factories\\" => "site/$tenant/database/factories/",
-                "Site\\$tenant\\Database\\Seeders\\"   => "site/$tenant/database/seeders/",
+                "Site\\$tenantStudy\\App\\"                 => "site/$tenant/app/",
+                "Site\\$tenantStudy\\Database\\Factories\\" => "site/$tenant/database/factories/",
+                "Site\\$tenantStudy\\Database\\Seeders\\"   => "site/$tenant/database/seeders/",
             ];
 
             foreach ($autoloads as $ns => $path) {

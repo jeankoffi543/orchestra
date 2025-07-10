@@ -77,9 +77,12 @@ class Tenancy
             $stubSite = module_path('.stub/.site');
 
             // check if tenant already exists
-            if (File::exists($basePath)) {
-                throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
+            if (app()->runningInConsole()) {
+                if (File::exists($basePath)) {
+                    throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
+                }
             }
+
 
             LessTenancy::createStub($stubSite, $basePath, $rollback);
 

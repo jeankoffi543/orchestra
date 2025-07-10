@@ -60,7 +60,9 @@ class InstallTenantCommand extends Command
             $installer->prepareInstallation(parseTenantName($master), $domain, $driver, $rollback, $this->output);
 
             // run deployer
-            $this->call('orchestra:create:deployer');
+            $this->call('orchestra:create:deployer', [
+                'name' => $master,
+            ]);
 
             $this->call('schedule:clear-cache');
 

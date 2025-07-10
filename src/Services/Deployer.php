@@ -5,6 +5,7 @@ namespace Kjos\Orchestra\Services;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Kjos\Orchestra\Facades\Concerns\Tenancy;
 
 class Deployer extends Shell
 {
@@ -20,6 +21,9 @@ class Deployer extends Shell
     protected string $ln;
     protected string $bash;
     protected string $mkdir;
+    protected string $chown;
+    protected string $chmod;
+    protected string $find;
 
     public function __construct()
     {
@@ -40,20 +44,48 @@ class Deployer extends Shell
         $this->a2dissite = \trim(\shell_exec('which a2dissite'));
         $this->mkdir     = \trim(\shell_exec('which mkdir'));
         $this->bash      = \trim(\shell_exec('which bash'));
+        $this->chown     = \trim(\shell_exec('which chown'));
+        $this->chmod     = \trim(\shell_exec('which chmod'));
+        $this->find      = \trim(\shell_exec('which find'));
     }
 
-    public function init(): void
+    public function init(?string $name = null): void
     {
         try {
+            // this execution order is important
+
+            // 1 - create deployer file
             $this->createFile('/etc/sudoers.d/deployer');
+
+            // 2 - add deployer user command to sudoers
             $this->userCommand();
+
+            // 3 - add deployer script for vhost management
             $this->addScript();
 
+            // 4 - enable cache for scheduled jobs
             if (config('cache.default') === 'database') {
-                Artisan::call('cache:table');
-                Artisan::call('migrate');
+                $files = Tenancy::fileIterator("{$this->basePath}/database/migrations");
+                foreach ($files as $file) {
+                    if (\preg_match('/.*cache.*/', $file->getFilename())) {
+                        Artisan::call('cache:table');
+                        Artisan::call('migrate', [
+                            '--path' => "{$this->basePath}/database/migrations/{$file->getFilename()}",
+                        ]);
+                        break;
+                    }
+                }
             }
 
+            // 5 - fix laravel permissions
+            $this->fixLaravelPermissions($this->basePath);
+
+            // 6 - fix laravel permissions for tenants
+            if ($name) {
+                $this->fixLaravelPermissions("{$this->basePath}/site/{$name}");
+            }
+
+            // 7 - create crontab
             $this->crontab();
         } catch (\Exception $e) {
             $this->reset();
@@ -78,8 +110,8 @@ class Deployer extends Shell
 
         if ($remove) {
             $newCrontab = collect(\explode("\n", $currentCrontab))
-               ->reject(fn ($line) => \str_contains($line, $cronCmd))
-               ->implode("\n");
+                ->reject(fn ($line) => \str_contains($line, $cronCmd))
+                ->implode("\n");
 
             \file_put_contents('/tmp/mycron', \trim($newCrontab) . PHP_EOL);
             \exec('crontab /tmp/mycron');
@@ -106,18 +138,18 @@ class Deployer extends Shell
     {
         \file_put_contents($this->scriptPath, $this->generateDeployerScript());
         $this->addCode("sudo chmod +x {$this->scriptPath}")
-           ->addCode("sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->scriptPath}")
-           ->addCode("sudo chmod 750 {$this->scriptPath}")
-           ->addCode("sudo touch {$this->cronLogPath}")
-           ->addCode("sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->cronLogPath}")
-           ->addCode("sudo chmod 750 {$this->cronLogPath}")
-           ->execute();
+            ->addCode("sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->scriptPath}")
+            ->addCode("sudo chmod 750 {$this->scriptPath}")
+            ->addCode("sudo touch {$this->cronLogPath}")
+            ->addCode("sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->cronLogPath}")
+            ->addCode("sudo chmod 750 {$this->cronLogPath}")
+            ->execute();
     }
 
     public function userCommand(): void
     {
-        $this->addCode("echo '{$this->currentsystUser} ALL=(ALL) NOPASSWD: {$this->mv}, {$this->rm}, {$this->a2ensite}, {$this->a2dissite}, {$this->systemctl}, {$this->ln}, {$this->mkdir}' | sudo tee -a /etc/sudoers.d/deployer")
-           ->execute();
+        $this->addCode("echo '{$this->currentsystUser} ALL=(ALL) NOPASSWD: {$this->mv}, {$this->rm}, {$this->a2ensite}, {$this->a2dissite}, {$this->systemctl}, {$this->ln}, {$this->mkdir}, {$this->chown}, {$this->chmod}, {$this->find}' | sudo tee -a /etc/sudoers.d/deployer")
+            ->execute();
     }
 
     public function createFile(string $path): void
@@ -331,5 +363,42 @@ class Deployer extends Shell
         }
 
         return $cronLog;
+    }
+
+    public function fixLaravelPermissions(string $base): void
+    {
+        $wwwUser = 'www-data'; // adapte si nécessaire : apache, nginx, etc.
+
+        // $base = $this->basePath;
+
+        $commands = [
+            // Propriétaire
+            "sudo chown -R {$this->currentsystUser}:$wwwUser $base",
+
+            // Fixer droits sur storage et bootstrap/cache
+            "sudo find $base/storage -type d -exec chmod 775 {} +",
+            "sudo find $base/storage -type f -exec chmod 664 {} +",
+            "sudo chmod -R ug+rwx $base/storage",
+
+            "sudo find $base/bootstrap/cache -type d -exec chmod 775 {} +",
+            "sudo find $base/bootstrap/cache -type f -exec chmod 664 {} +",
+            "sudo chmod -R ug+rwx $base/bootstrap/cache",
+
+            // Logs
+            "sudo chmod -R ug+rw $base/storage/logs",
+
+            // Lien symbolique public_html s'il existe
+            'sudo find /var/www/html -type l -exec chmod 755 {} +',
+            // change the script owner to current user to allow execution
+            "sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->scriptPath}",
+            // S'assurer que les scripts dans vendor/bin sont exécutables
+            // "sudo find $base/vendor/bin -type f -exec chmod +x {} +",
+        ];
+
+        foreach ($commands as $cmd) {
+            $this->addCode($cmd);
+        }
+
+        $this->execute();
     }
 }
