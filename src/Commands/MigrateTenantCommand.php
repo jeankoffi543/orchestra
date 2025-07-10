@@ -14,7 +14,7 @@ class MigrateTenantCommand extends Command
 {
     protected $name        = 'orchestra:migrate';
     protected $description = 'Migrate a tenant database';
-    protected $signature   = 'orchestra:migrate {name : The name of the tenant} {--all : Migrate all tenants} {--rollback-on-fail=true : Rollback on fail}';
+    protected $signature   = 'orchestra:migrate {name? : The name of the tenant} {--all : Migrate all tenants} {--master : Migrate the master tenant} {--rollback-on-fail=true : Rollback on fail}';
 
     /**
      * Execute the console command.
@@ -43,8 +43,19 @@ class MigrateTenantCommand extends Command
                     });
                 }
             } else {
-                $name = $this->argument('name');
-                $tenants->runFor($name, function (TenantContext $tenant) use (&$migratedTenants) {
+                if ($name = $this->argument('name')) {
+                    $tenants->runFor($name, function (TenantContext $tenant) use (&$migratedTenants) {
+                        runInConsole(fn () => $this->info("Migration du tenant: {$tenant->name}"));
+                        Artisan::call('migrate', ['--path' => 'database/migrations/tenants', '--force' => true]);
+                        runInConsole(fn () => $this->line(Artisan::output()));
+
+                        $migratedTenants[] = $tenant->name;
+                    });
+                }
+            }
+
+            if ($this->option('master')) {
+                $tenants->runFor(config('orchestra.master.name'), function (TenantContext $tenant) use (&$migratedTenants) {
                     runInConsole(fn () => $this->info("Migration du tenant: {$tenant->name}"));
                     Artisan::call('migrate', ['--path' => 'database/migrations/tenants', '--force' => true]);
                     runInConsole(fn () => $this->line(Artisan::output()));

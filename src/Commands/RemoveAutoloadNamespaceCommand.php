@@ -4,6 +4,7 @@ namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 
 class RemoveAutoloadNamespaceCommand extends Command
 {
@@ -32,6 +33,7 @@ class RemoveAutoloadNamespaceCommand extends Command
         try {
             $name         = $this->argument('name');
             $composerPath = base_path('composer.json');
+            $nameStudy    = Str::studly($name);
 
             if (!\file_exists($composerPath)) {
                 runInConsole(fn () => $this->error('composer.json introuvable.'));
@@ -49,9 +51,9 @@ class RemoveAutoloadNamespaceCommand extends Command
 
             $psr4       = &$composer['autoload']['psr-4'];
             $namespaces = [
-                "Site\\{$name}\\App\\",
-                "Site\\{$name}\\Database\\Factories\\",
-                "Site\\{$name}\\Database\\Seeders\\",
+                "Site\\{$nameStudy}\\App\\",
+                "Site\\{$nameStudy}\\Database\\Factories\\",
+                "Site\\{$nameStudy}\\Database\\Seeders\\",
             ];
 
             $modified = false;

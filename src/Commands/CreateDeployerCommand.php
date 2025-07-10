@@ -28,7 +28,7 @@ class CreateDeployerCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'orchestra:create:deployer';
+    protected $signature = 'orchestra:create:deployer {name?}';
 
     /**
      * Handle the command.
@@ -66,7 +66,7 @@ class CreateDeployerCommand extends Command
             $this->line("\nCette opération configure également les droits d’accès nécessaires pour permettre à l'application web de déléguer ces actions à '{$user}'.\n");
 
             if ($this->confirm('Souhaitez-vous procéder à la création de cet utilisateur ?', true)) {
-                $deployer->init();
+                $deployer->init($this->argument('name'));
                 $this->info("✅ Utilisateur '{$user}' configuré avec succès.");
             } else {
                 $this->warn("❌ Opération annulée. L'utilisateur '{$user}' n'a pas été créé.");

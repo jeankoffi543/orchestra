@@ -17,6 +17,12 @@ return [
             'prefix' => 'web',
             'middleware' => 'web',
             'file_name' => 'web.php',
+         ],
+         [
+            'name' => 'master',
+            'prefix' => 'console',
+            'middleware' => 'console',
+            'file_name' => 'console.php',
          ]
       ],
    ],
@@ -34,6 +40,12 @@ return [
             'prefix' => 'web',
             'middleware' => 'web',
             'file_name' => 'web.php',
+         ],
+         [
+            'name' => 'slave',
+            'prefix' => 'console',
+            'middleware' => 'console',
+            'file_name' => 'console.php',
          ]
       ],
    ],

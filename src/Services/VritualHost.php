@@ -56,13 +56,13 @@ class VritualHost extends Deployer
             $vhosts  = collect($this->vhostSites());
             // domains who are not vhosts
             $domains->filter(fn ($d) => ! $vhosts->contains($d))
-               ->each(function ($domain, $key) {
-                   $this->name          = parseTenantName($key);
-                   $this->domain        = $domain;
-                   $this->savedConfPath = base_path("site/{$this->name}/storage/app/private/{$this->confPrefix}{$this->domain}.conf");
-                   $this->basePath      = base_path("site/{$this->name}");
-                   $this->create();
-               });
+                ->each(function ($domain, $key) {
+                    $this->name          = parseTenantName($key);
+                    $this->domain        = $domain;
+                    $this->savedConfPath = base_path("site/{$this->name}/storage/app/private/{$this->confPrefix}{$this->domain}.conf");
+                    $this->basePath      = base_path("site/{$this->name}");
+                    $this->create();
+                });
             // clean orphans sites
             $this->cleanOrphans();
         } catch (\Exception $e) {
@@ -75,11 +75,11 @@ class VritualHost extends Deployer
         $vhosts  = collect($this->vhostSites());
         $domains = collect(Tenancy::getDomains());
         $vhosts->filter(fn ($d) => ! $domains->contains($d))
-           ->each(function ($domain, $key) {
-               $this->name   = parseTenantName($key);
-               $this->domain = $domain;
-               $this->remove();
-           });
+            ->each(function ($domain, $key) {
+                $this->name   = parseTenantName($key);
+                $this->domain = $domain;
+                $this->remove();
+            });
     }
 
     /**
@@ -105,10 +105,19 @@ class VritualHost extends Deployer
         if (File::exists($this->scriptPath)) {
             $content = $this->generateVirtualHost($this->domain, public_path(), $this->name);
 
-            \file_put_contents($this->savedConfPath, $content);
+            // \file_put_contents($this->savedConfPath, $content);
+
+            $tempFile = \tempnam(\sys_get_temp_dir(), 'vhost_');
+            \file_put_contents($tempFile, $content);
+            $this->addCode("sudo mv {$tempFile} {$this->savedConfPath}");
+
             $basePath = base_path();
             $this->addCode("$this->scriptPath deploy --conf {$this->savedConfPath} --name {$this->name} --domain {$this->domain} --base-path {$basePath} --cron-log {$this->cronLogPath}")
-               ->execute();
+                ->execute();
+
+            if (\file_exists($tempFile)) {
+                \unlink($tempFile);
+            }
         }
     }
 
@@ -120,7 +129,7 @@ class VritualHost extends Deployer
         if (File::exists($this->scriptPath)) {
             $basePath = base_path();
             $this->addCode("$this->scriptPath remove --conf {$this->confPrefix}{$this->domain}.conf --domain {$this->domain} --base-path {$basePath} --cron-log {$this->cronLogPath}")
-               ->execute();
+                ->execute();
 
             removeFileSecurely($this->cronLogPath ?? '');
         }
