@@ -5,7 +5,6 @@ namespace Kjos\Orchestra\Facades\Concerns;
 use Illuminate\Support\Collection;
 use Kjos\Orchestra\Facades\Oor;
 
-/** @phpstan-ignore-next-line */
 trait InterractWithServiceProvider
 {
     private function getSlavePath(Collection $route): ?string
@@ -17,5 +16,14 @@ trait InterractWithServiceProvider
         }
 
         return $path;
+    }
+
+    /**
+     * @param array{name: string, prefix: string, middleware: string, file_name: string} $route
+     * @return \Illuminate\Support\Collection<string, string>
+     */
+    private function routeToCollection(array $route): \Illuminate\Support\Collection
+    {
+        return collect($route);
     }
 }
