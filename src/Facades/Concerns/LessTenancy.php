@@ -43,6 +43,30 @@ class LessTenancy
         );
     }
 
+    public static function createStubTest(string $from, string $to, RollbackManager $rollback): void
+    {
+        rollback_catch(
+            function () use ($from, $to, $rollback) {
+                File::copyDirectory($from, "$to/");
+                $rollback->add(fn () => File::deleteDirectory($to));
+
+                File::copy("$from/.env.example", "$to/.env");
+                $rollback->add(fn () => File::delete("$to/.env"));
+
+
+                Tenancy::putRoutesDefaultContent(Tenancy::testRoutesDefaultContent('web'), "$to/routes/web.php");
+                $rollback->add(fn () => Tenancy::removeRoutesDefaultContent(Tenancy::testRoutesDefaultContent('web'), "$to/routes/web.php"));
+
+                Tenancy::putRoutesDefaultContent(Tenancy::testRoutesDefaultContent('api'), "$to/routes/api.php");
+                $rollback->add(fn () => Tenancy::removeRoutesDefaultContent(Tenancy::testRoutesDefaultContent('api'), "$to/routes/api.php"));
+
+                Tenancy::putRoutesDefaultContent(Tenancy::testRoutesDefaultContent('console'), "$to/routes/console.php");
+                $rollback->add(fn () => Tenancy::removeRoutesDefaultContent(Tenancy::testRoutesDefaultContent('console'), "$to/routes/console.php"));
+            },
+            $rollback
+        );
+    }
+
     /**
      * Create a tenant database using the provided credentials.
      *
@@ -261,13 +285,13 @@ class LessTenancy
      *
      * @throws \Exception If an error occurs during the domain addition.
      */
-    public static function addDomain(string $name, string $domain, RollbackManager $rollback): void
+    public static function addDomain(string $name, string $domain, RollbackManager $rollback, ?string $path = null): void
     {
         rollback_catch(
-            function () use ($name, $domain, $rollback) {
-                Tenancy::addDomain($name, $domain);
-                $rollback->add(function () use ($name) {
-                    Tenancy::removeDomain($name);
+            function () use ($name, $domain, $rollback, $path) {
+                Tenancy::addDomain($name, $domain, $path);
+                $rollback->add(function () use ($name, $path) {
+                    Tenancy::removeDomain($name, $path);
                 });
             },
             $rollback
@@ -290,13 +314,13 @@ class LessTenancy
      *
      * @throws \Exception If an error occurs during the domain removal.
      */
-    public static function removeDomain(string $name, string $domain, RollbackManager $rollback): void
+    public static function removeDomain(string $name, string $domain, RollbackManager $rollback, ?string $path = null): void
     {
         rollback_catch(
-            function () use ($name, $domain, $rollback) {
-                Tenancy::removeDomain($name);
-                $rollback->add(function () use ($name, $domain) {
-                    Tenancy::addDomain($name, $domain);
+            function () use ($name, $domain, $rollback, $path) {
+                Tenancy::removeDomain($name, $path);
+                $rollback->add(function () use ($name, $domain, $path) {
+                    Tenancy::addDomain($name, $domain, $path);
                 });
             },
             $rollback

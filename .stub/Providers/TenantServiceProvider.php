@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Kjos\Orchestra\Facades\Concerns\InterractWithServiceProvider;
 use Kjos\Orchestra\Facades\Oor;
 
 class TenantServiceProvider extends ServiceProvider
 {
+    use InterractWithServiceProvider;
     /**
      * Register any application services.
      */
@@ -21,10 +23,12 @@ class TenantServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (app()->runningInConsole()) return;
-        app(\Kjos\Orchestra\Facades\Oor::class)::initialize();
-
-        $this->mapRoutes();
+        $this->app->booted(function () {
+            if (!app()->runningInConsole() || app()->environment('testing')) {
+                Oor::initialize();
+                $this->mapRoutes();
+            }
+        });
     }
 
     /**
@@ -35,7 +39,7 @@ class TenantServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    public function mapRoutes(): void
+    private function mapRoutes(): void
     {
         if (Oor::getCurrent() === config('orchestra.master.name')) {
             // matser routes
@@ -53,7 +57,7 @@ class TenantServiceProvider extends ServiceProvider
                 Route::prefix($route->get('prefix', 'api'))
                     ->middleware($route->get('middleware', 'api'))
                     ->name($route->get('name', 'slave') . '.')
-                    ->group(base_path("site/" . Oor::getCurrent() . "/routes/" . $route->get('file_name', 'api.php')));
+                    ->group($this->getSlavePath($route));
             }
         }
     }

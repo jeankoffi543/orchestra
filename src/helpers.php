@@ -53,8 +53,12 @@ if (!\function_exists('parseTenantName')) {
      * @param string $name The tenant name to normalize.
      * @return string The normalized tenant name.
      */
-    function parseTenantName(string $name): string
+    function parseTenantName(?string $name = null): string
     {
+        if (!$name) {
+            return 'default';
+        }
+
         return Str::snake($name);
     }
 }

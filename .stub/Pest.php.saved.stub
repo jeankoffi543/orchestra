@@ -1,0 +1,33 @@
+<?php
+/*
+|--------------------------------------------------------------------------
+| Test Case
+|--------------------------------------------------------------------------
+|
+| The closure you provide to your test functions is always bound to a specific PHPUnit test
+| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
+| need to change it using the "pest()" function to bind a different classes or traits.
+|
+*/
+
+use Kjos\Orchestra\Facades\Oor;
+
+\pest()->extend(Kjos\Orchestra\Contexts\MasterTestCase::class)
+    ->group('master')->in('Feature/Master');
+
+\pest()->extend(Kjos\Orchestra\Contexts\SlaveTestCase::class)
+    ->afterEach(function () {
+        Oor::delete('master_test');
+    })
+    ->group('slave')->in('Feature/Slave');
+
+/*
+|--------------------------------------------------------------------------
+| Expectations
+|--------------------------------------------------------------------------
+|
+| When you're writing tests, you often need to check that values meet certain conditions. The
+| "expect()" function gives you access to a set of "expectations" methods that you can use
+| to assert different things. Of course, you may extend the Expectation API at any time.
+|
+*/

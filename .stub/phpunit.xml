@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+
+        <!-- master -->
+        <env name="MASTER_APP_URL" value="http://operaorchestralrms.local"/>
+        <env name="MASTER_DB_CONNECTION" value="pgsql_master_test"/>
+        <env name="MASTER_DB_HOST" value="127.0.0.1"/>
+        <env name="MASTER_DB_PORT" value="5432"/>
+        <env name="MASTER_DB_DATABASE" value="operaorchestralrms_master_test"/>
+        <env name="MASTER_DB_DRIVER" value="pgsql"/>
+        <env name="MASTER_DB_USERNAME" value="put_here_the_master_username"/>
+        <env name="MASTER_DB_PASSWORD" value="put_here_the_master_password"/>
+        <env name="MASTER_APP_NAME" value=""/>
+        
+        <!-- slave -->
+        <env name="SLAVE_APP_URL" value="http://operaorchestralrmsslave.local"/>
+        <env name="SLAVE_DB_CONNECTION" value="pgsql_slave_test"/>
+        <env name="SLAVE_DB_HOST" value="127.0.0.1"/>
+        <env name="SLAVE_DB_PORT" value="5432"/>
+        <env name="SLAVE_DB_DATABASE" value="operaorchestralrms_slave_test"/>
+        <env name="SLAVE_DB_DRIVER" value="pgsql"/>
+        <env name="SLAVE_DB_USERNAME" value="put_here_the_slave_username"/>
+        <env name="SLAVE_DB_PASSWORD" value="put_here_the_slave_password"/>
+        <env name="SLAVE_APP_NAME" value=""/>
+
+        <env name="APP_ENV" value="testing"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        
+    </php>
+</phpunit>
