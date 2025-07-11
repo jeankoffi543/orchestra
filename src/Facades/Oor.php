@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static void create(array<string, mixed> $data, ?string $driver = 'pgsql', bool $migrate = true)
+ * @method static void createTesting(array<string, mixed> $data)
  * @method static void delete(string $name, ?string $driver = 'pgsql', ?string $domain = '')
+ * @method static void cleartenantTesting(string $name, string $domain)
  * @method static void update(array<string, mixed> $data)
  * @method static void switch(string $tenant)
  * @method static void use(string $name, \Closure $callback)

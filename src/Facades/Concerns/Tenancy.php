@@ -21,15 +21,17 @@ class Tenancy
     protected static string $sitePath;
     protected static string $composerPath;
     protected static string $moduleSitePath;
+    protected static string $testingSitePath;
 
     /** @var array<string, mixed> */
     public static array $defaulEnv = [];
 
     public static function init(string $moduleStubPath): void
     {
-        self::$sitePath       = getBasePath();
-        self::$stubPasth      = getStubPath();
-        self::$moduleStubPath = $moduleStubPath;
+        self::$sitePath        = getBasePath();
+        self::$stubPasth       = getStubPath();
+        self::$moduleStubPath  = $moduleStubPath;
+        self::$testingSitePath = storage_path('framework/testing/site');
 
         self::$defaulEnv['DB_PASSWORD']         = '';
         self::$defaulEnv['DB_CONNECTION']       = 'mysql';
@@ -121,24 +123,97 @@ class Tenancy
     }
 
     /**
+     * Create a tenant in testing mode.
+     *
+     * This function creates a new tenant by creating a stub site, linking its storage,
+     * and adding the tenant's domain to the tenants file.
+     *
+     * @param array<string, mixed> $data An associative array containing the tenant data,
+     *                                   including the 'name' of the tenant and its domain.
+     *
+     * @return void
+     */
+    public static function createTenantTesting(array $data): void
+    {
+        $rollback = new RollbackManager();
+
+        // Validate data
+        self::validateData($data, [
+            'name'    => ['required', new TenantNameRule()],
+            'domains' => ['required', new DomainRule()],
+        ]);
+        $name     = parseTenantName($data['name']);
+        $domain   = $data['domains'];
+        $basePath = self::$testingSitePath . '/' . $name;
+
+        $domainsPath = self::$testingSitePath . '/.tenants';
+        ;
+
+        // stub
+        $stubSite = module_path('.stub/.site');
+
+        // check if tenant already exists
+        if (app()->runningInConsole()) {
+            if (File::exists($basePath)) {
+                throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
+            }
+        }
+
+        LessTenancy::createStubTest($stubSite, $basePath, $rollback);
+
+        // Link tenant storage
+        LessTenancy::linkTenant($name, $rollback);
+
+        // add $name=$domain to tenants file
+        LessTenancy::addDomain($name, $domain, $rollback, $domainsPath);
+    }
+
+    public static function cleartenantTesting(string $name, string $domain): void
+    {
+        $rollback = new RollbackManager();
+
+        try {
+            $name        = parseTenantName($name);
+            $basePath    = self::$testingSitePath . '/' . $name;
+            $domainsPath = self::$testingSitePath . '/.tenants';
+            ;
+
+            // unlink tenant storage
+            LessTenancy::unlinkTenant($name, $rollback);
+
+            // remove tenant folder
+            File::deleteDirectory($basePath);
+
+            // remove $name=$domain from tenants file
+            LessTenancy::removeDomain($name, $domain, $rollback, $domainsPath);
+        } catch (\Exception $e) {
+            // throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Return the default route content for the given route name.
      *
      * @param string $name The name of the route. Can be 'web' or 'api'.
      * @return string The default route content.
      */
-    public static function getRoutesDefaultContent(string $name): string
+    public static function testRoutesDefaultContent(string $name): string
     {
-        $content = '';
-        switch ($name) {
-            case 'web':
-                $content = \file_get_contents(module_path('.stub/routes/.default.web.stub'));
-                break;
-            case 'api':
-                $content = \file_get_contents(module_path('.stub/routes/.default.api.stub'));
-                break;
-        }
+        $path    = base_path("routes/{$name}.php");
+        $content = <<<CONTENT
+                // use Illuminate\Support\Facades\Route;
+
+                if (app('files')->exists('{$path}')) {
+                    Route::group([], '{$path}');
+                }
+            CONTENT;
 
         return $content;
+    }
+
+    public static function getRoutesDefaultContent(string $name): string
+    {
+        return \file_get_contents(module_path(".stub/routes/.default.{$name}.stub"));
     }
 
     /**
@@ -500,12 +575,12 @@ class Tenancy
      *
      * @param string $name The name of the tenant whose domain is to be removed.
      */
-    public static function removeDomain(string $name): void
+    public static function removeDomain(string $name, ?string $path = null): void
     {
-        $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = [];
-        if (File::exists($tenantsFile)) {
-            $tenants = \parse_ini_file($tenantsFile);
+        $path    = $path ?? getBasePath() . '/.tenants';
+        $tenants = [];
+        if (File::exists($path)) {
+            $tenants = \parse_ini_file($path);
         }
         foreach ($tenants as $key => $value) {
             if ($key === $name) {
@@ -513,7 +588,7 @@ class Tenancy
             }
         }
 
-        self::parseDomainContent($tenants, $tenantsFile);
+        self::parseDomainContent($tenants, $path);
     }
 
     /**
@@ -526,11 +601,11 @@ class Tenancy
      * @param string $name The name of the tenant whose domain is to be added.
      * @param string $domain The domain to add to the tenant.
      */
-    public static function addDomain(string $name, string $domain): void
+    public static function addDomain(string $name, string $domain, ?string $path = null): void
     {
+        $path = $path ?? getBasePath() . '/.tenants';
         if (!self::getDomain($name)) {
-            $tenantsFile = getBasePath() . '/.tenants';
-            File::append($tenantsFile, "$name=$domain\n");
+            File::append($path, "$name=$domain\n");
         }
     }
 
@@ -543,12 +618,12 @@ class Tenancy
      * @param string $name The name of the tenant whose domain is to be retrieved.
      * @return string|null The domain associated with the tenant, or null if the tenant does not exist.
      */
-    public static function getDomain(string $name): ?string
+    public static function getDomain(string $name, ?string $path = null): ?string
     {
-        $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = [];
-        if (File::exists($tenantsFile)) {
-            $tenants = \parse_ini_file($tenantsFile);
+        $path    = $path ?? getBasePath() . '/.tenants';
+        $tenants = [];
+        if (File::exists($path)) {
+            $tenants = \parse_ini_file($path);
         }
 
         return $tenants[$name] ?? null;
@@ -564,12 +639,12 @@ class Tenancy
      *
      * @return array<string, string>|null An associative array of tenant names and domains, or null if the tenants file does not exist.
      */
-    public static function getDomains(): ?array
+    public static function getDomains(?string $path = null): ?array
     {
-        $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = [];
-        if (File::exists($tenantsFile)) {
-            $tenants = \parse_ini_file($tenantsFile);
+        $path    = $path ?? getBasePath() . '/.tenants';
+        $tenants = [];
+        if (File::exists($path)) {
+            $tenants = \parse_ini_file($path);
         }
 
         return $tenants;
@@ -580,12 +655,12 @@ class Tenancy
      *
      * @return array<string, string> tenant name as key and tenant data as value
      */
-    public static function getTenants(): array
+    public static function getTenants(?string $path = null): array
     {
-        $tenantsFile = getBasePath() . '/.tenants';
-        $tenants     = [];
-        if (File::exists($tenantsFile)) {
-            $tenants = \parse_ini_file($tenantsFile);
+        $path    = $path ?? getBasePath() . '/.tenants';
+        $tenants = [];
+        if (File::exists($path)) {
+            $tenants = \parse_ini_file($path);
         }
 
         return $tenants;
@@ -629,8 +704,22 @@ class Tenancy
     {
         $request = request();
         $domain  = $request->getHost();
+        // if we are in test mode master test user master tenant for testing
+        $isMaster = config('orchestra.master.domain') === $domain;
+        if (app()->runningInConsole() && app()->environment('testing') && ! $isMaster) {
+            self::createTenantTesting(
+                [
+                    'name'    => \getenv('SLAVE_APP_NAME'),
+                    'domains' => \str_replace('http://', '', \getenv('SLAVE_APP_URL')),
+                ]
+            );
+
+            return \getenv('SLAVE_APP_NAME');
+        }
+
         $tenants = self::getTenants();
-        $name    = collect($tenants)->filter(fn ($t) => $t === $domain)->toArray();
+
+        $name = collect($tenants)->filter(fn ($t) => $t === $domain)->toArray();
 
         return \array_key_first($name);
     }
@@ -684,7 +773,7 @@ class Tenancy
      */
     public static function switchToTenant(?string $name = null): void
     {
-        if (!$name) {
+        if (!$name && ! app()->environment('testing')) {
             abort(404);
         }
 

@@ -38,6 +38,38 @@ class OperaBuilder
         Tenancy::createTenant($data, $driver, $migrate);
     }
 
+    /**
+     * Create a new testing tenant.
+     *
+     * This function creates a new tenant for testing purposes using the provided data.
+     * It validates the tenant data, generates database credentials, and configures
+     * the tenant environment without migrating the database schema.
+     *
+     * @param array<string, mixed> $data An associative array containing tenant data,
+     *                                   including 'name' and 'domains'.
+     * @return void
+     */
+    public function createTesting(array $data): void
+    {
+        Tenancy::createTenantTesting($data);
+    }
+
+    /**
+     * Clean up a tenant used for testing.
+     *
+     * This function removes all files and directories associated with the given tenant,
+     * including its storage, site directory, and database credentials.
+     * It also removes the tenant's domain from the tenants file.
+     *
+     * @param string $anme The name of the tenant to clean up.
+     * @param string $domain The domain of the tenant to remove from the tenants file.
+     * @return void
+     */
+    public function cleartenantTesting(string $anme, string $domain): void
+    {
+        Tenancy::cleartenantTesting($anme, $domain);
+    }
+
     protected function deleteTenant(string $name, ?string $driver = 'pgsql', ?string $domain = ''): void
     {
         Tenancy::deleteTenant($name, $driver, $domain);

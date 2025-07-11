@@ -38,6 +38,7 @@ class OrchestraServiceProvider extends ServiceProvider
             \Kjos\Orchestra\Commands\RemoveDeployerCommand::class,
             \Kjos\Orchestra\Commands\MakeVirtualHostScanCommand::class,
             \Kjos\Orchestra\Commands\RemoveVirtualHostsCommand::class,
+            \Kjos\Orchestra\Commands\DatabaseCreateCommand::class,
         ]);
         //Register facade
         $this->app->singleton('oor', function ($app) {

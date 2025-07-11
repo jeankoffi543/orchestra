@@ -11,6 +11,7 @@ use Kjos\Orchestra\Rules\DataBaseNameRule;
 use Kjos\Orchestra\Rules\PassWordRule;
 use Kjos\Orchestra\Rules\UserNameRule;
 use PDO;
+use PDOException;
 
 class TenantDatabaseManager
 {
@@ -31,35 +32,41 @@ class TenantDatabaseManager
      *
      * @return void
      */
-    public static function connect(?string $driver = 'pgsql', ?string $tenantName = ''): void
+    public static function connect(?string $driver = 'pgsql', ?string $tenantName = '', string $connection = 'pgsql', string $dbhost = '127.0.0.1', string $dbport = '5432'): void
     {
-        self::$driver       = $driver;
-        self::$tenantName   = $tenantName;
-        self::$mainUserName = config('database.connections.pgsql.username');
-        self::$mainPassword = config('database.connections.pgsql.password');
+        try {
+            self::$driver       = $driver;
+            self::$tenantName   = $tenantName;
+            self::$mainUserName = config("database.connections.{$connection}.username");
+            self::$mainPassword = config("database.connections.{$connection}.password");
 
-        switch ($driver) {
-            case 'pgsql':
-                self::$pdo = new PDO(
-                    'pgsql:host=127.0.0.1;port=5432',
-                    self::$mainUserName, // user with CREATE/DROP DB & ROLE
-                    self::$mainPassword,
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-                );
-                break;
-            case 'mysql':
-                self::$pdo = new PDO(
-                    'mysql:host=127.0.0.1;port=3306',
-                    self::$mainUserName, // user with CREATE/DROP DB
-                    self::$mainPassword,
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-                );
-                break;
-            case 'sqlite':
-                self::$pdo = new PDO('sqlite::memory:'); // SQLite is file-based
-                break;
-            default:
-                throw new Exception("Unsupported driver: {$driver}");
+            switch ($driver) {
+                case 'pgsql':
+                    self::$pdo = new PDO(
+                        "pgsql:host={$dbhost};port={$dbport}",
+                        self::$mainUserName, // user with CREATE/DROP DB & ROLE
+                        self::$mainPassword,
+                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+                    );
+                    break;
+                case 'mysql':
+                    $dbhost    = $dbhost;
+                    $dbhost    = $dbport == '5432' ?: '3306';
+                    self::$pdo = new PDO(
+                        "mysql:host={$dbhost};port={$dbport}",
+                        self::$mainUserName, // user with CREATE/DROP DB
+                        self::$mainPassword,
+                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+                    );
+                    break;
+                case 'sqlite':
+                    self::$pdo = new PDO('sqlite::memory:'); // SQLite is file-based
+                    break;
+                default:
+                    throw new Exception("Unsupported driver: {$driver}");
+            }
+        } catch (Exception $e) {
+            throw $e;
         }
     }
 
@@ -148,10 +155,18 @@ class TenantDatabaseManager
                 : "CREATE DATABASE `$dbname`";
 
             self::$pdo->exec($sql);
-        } catch (Exception $e) {
-            if (!\str_contains($e->getMessage(), 'exists')) {
-                throw $e;
+        } catch (PDOException $e) {
+            // PostgreSQL code 42P04 = duplicate_database
+            if (self::$driver === 'pgsql' && $e->getCode() === '42P04') {
+                return;
             }
+
+            // MySQL code 1007 = ER_DB_CREATE_EXISTS
+            if (self::$driver === 'mysql' && $e->errorInfo[1] === 1007) {
+                return;
+            }
+
+            throw $e;
         }
     }
 

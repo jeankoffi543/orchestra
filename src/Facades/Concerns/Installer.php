@@ -2,6 +2,7 @@
 
 namespace Kjos\Orchestra\Facades\Concerns;
 
+use DOMDocument;
 use Exception;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Http\Response;
@@ -23,6 +24,7 @@ class Installer extends OperaBuilder
      */
     public function __construct()
     {
+        parent::__construct();
         $this->pintPaths = new Collection();
     }
 
@@ -104,10 +106,18 @@ class Installer extends OperaBuilder
                 $rollback
             );
 
+            rollback_catch(
+                function () use ($rollback) {
+                    $this->addTest();
+                    $rollback->add(fn () => $this->removeTest());
+                },
+                $rollback
+            );
+
             // format code
             \exec('./vendor/bin/pint ' . $this->getPintPaths(), $output, $status);
         } catch (\Exception $e) {
-            throw new Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            throw new Exception($e, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -165,6 +175,16 @@ class Installer extends OperaBuilder
                 },
                 $rollback
             );
+
+
+            rollback_catch(
+                function () use ($rollback) {
+                    $this->removeTest();
+                    $rollback->add(fn () => $this->addTest());
+                },
+                $rollback
+            );
+
             $output && runInConsole(fn () => $output->info('Uninstallation complete'));
         } catch (\Exception $e) {
             throw new Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -346,5 +366,126 @@ class Installer extends OperaBuilder
         }
 
         return \implode(' ', $this->pintPaths->toArray());
+    }
+
+    /**
+     * Copies the test suite from the module stub to the application's
+     * "tests/Feature" directory. It also updates the "phpunit.xml" file
+     * with the MASTER_APP_URL, MASTER_APP_NAME, MASTER_DB_DATABASE,
+     * SLAVE_APP_URL, SLAVE_APP_NAME, and SLAVE_DB_DATABASE environment
+     * variables.
+     *
+     * The environment variables are set to the values in the config
+     * file "config/orchestra.php".
+     *
+     * The method also saves the existing "phpunit.xml" and "tests/Pest.php"
+     * files to the module stub directory with the ".saved" extension to
+     * restore them after uninstall.
+     *
+     * @return void
+     */
+    private function addTest(): void
+    {
+        $bastPath = base_path();
+
+        File::copyDirectory("{$this->moduleStubPath}/tests/Master", "{$bastPath}/tests/Feature/Master");
+        File::copyDirectory("{$this->moduleStubPath}/tests/Slave", "{$bastPath}/tests/Feature/Slave");
+
+        // get existing phpunit.xml content to restore it after uninstall
+        if (File::exists("{$bastPath}/phpunit.xml")) {
+            File::put("{$this->moduleStubPath}/phpunit.saved.xml", File::get("{$bastPath}/phpunit.xml"));
+        }
+
+        // get existing Pest.php content to restore it after uninstall
+        if (File::exists("{$bastPath}/tests/Pest.php")) {
+            File::put("{$this->moduleStubPath}/Pest.php.saved.stub", File::get("{$bastPath}/tests/Pest.php"));
+        }
+
+        // phpunit content
+        File::put("{$bastPath}/phpunit.xml", File::get("{$this->moduleStubPath}/phpunit.xml"));
+
+        $config = include config_path('orchestra.php');
+
+        $masterDomain = $config['master']['domain'] ?? '';
+        $masterName   = $config['master']['name']   ?? '';
+
+        // add app_url and app_name
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'MASTER_APP_URL', "http://{$masterDomain}");
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'MASTER_APP_NAME', $masterName);
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'MASTER_DB_DATABASE', $masterName);
+
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'SLAVE_APP_URL', "http://{$masterName}slave.local");
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'SLAVE_APP_NAME', "{$masterName}slave");
+        $this->updatePhpUnitEnvVar("{$bastPath}/phpunit.xml", 'SLAVE_DB_DATABASE', "{$masterName}slave");
+
+        // Pest content
+        $pestContent = File::get("{$this->moduleStubPath}/Pest.php.stub");
+        $content     = <<<CONTENT
+            <?php
+            {$pestContent}
+            CONTENT;
+
+        File::put("{$bastPath}/tests/Pest.php", $content);
+    }
+
+    /**
+     * Deletes the test suite added by the `addTest` method.
+     *
+     * It removes the "tests/Feature/Master" and "tests/Feature/Slave" directories and
+     * restores the original "phpunit.xml" and "tests/Pest.php" files from the
+     * module stub directory.
+     *
+     * @return void
+     */
+    private function removeTest(): void
+    {
+        $bastPath = base_path();
+
+        File::deleteDirectory("{$bastPath}/tests/Feature/Master");
+        File::deleteDirectory("{$bastPath}/tests/Feature/Slave");
+
+        File::put("{$bastPath}/phpunit.xml", File::get("{$this->moduleStubPath}/phpunit.saved.xml"));
+
+        // Pest content
+        $pestContent = File::get("{$this->moduleStubPath}/Pest.php.saved.stub");
+        $content     = <<<CONTENT
+            {$pestContent}
+            CONTENT;
+
+        File::put("{$bastPath}/tests/Pest.php", $content);
+    }
+
+    private function updatePhpUnitEnvVar(string $filePath, string $envName, string $newValue): bool
+    {
+        if (!\file_exists($filePath)) {
+            return false;
+        }
+
+        $dom                     = new DOMDocument();
+        $dom->preserveWhiteSpace = true;
+        $dom->formatOutput       = true;
+        $dom->load($filePath);
+
+        $envElements = $dom->getElementsByTagName('env');
+        $found       = false;
+
+        foreach ($envElements as $env) {
+            if ($env->getAttribute('name') === $envName) {
+                $env->setAttribute('value', $newValue);
+                $found = true;
+                break;
+            }
+        }
+
+        if (!$found) {
+            // Créer l'élément si non trouvé
+            $php    = $dom->getElementsByTagName('php')->item(0);
+            $newEnv = $dom->createElement('env');
+            $newEnv->setAttribute('name', $envName);
+            $newEnv->setAttribute('value', $newValue);
+            $php->appendChild($newEnv);
+        }
+
+        return $dom->save($filePath) !== false;
     }
 }

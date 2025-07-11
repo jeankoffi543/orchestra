@@ -71,11 +71,11 @@ class InstallTenantCommand extends Command
             return Command::SUCCESS;
         } catch (\Exception $e) {
             runInConsole(function () use ($e) {
-                $this->error($e->getMessage());
+                $this->error($e);
 
                 return Command::FAILURE;
             });
-            throw new \Exception($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            throw new \Exception($e, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
