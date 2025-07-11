@@ -44,7 +44,7 @@ class TenantServiceProvider extends ServiceProvider
         if (Oor::getCurrent() === config('orchestra.master.name')) {
             // matser routes
             foreach (config('orchestra.master.route') as $route) {
-                $route = collect($route);
+                $route = $this->routeToCollection($route);
                 Route::prefix($route->get('prefix', 'api'))
                     ->middleware($route->get('middleware', 'api'))
                     ->name($route->get('name', 'master') . '.')
@@ -53,7 +53,7 @@ class TenantServiceProvider extends ServiceProvider
         } else {
             // slave routes
             foreach (config('orchestra.slave.route') as $route) {
-                $route = collect($route);
+                $route = $this->routeToCollection($route);
                 Route::prefix($route->get('prefix', 'api'))
                     ->middleware($route->get('middleware', 'api'))
                     ->name($route->get('name', 'slave') . '.')

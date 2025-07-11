@@ -9,5 +9,6 @@ parameters:
 
     ignoreErrors:
         - '#Call to an undefined method Illuminate\\Support\\Collection::foobar#'
+        - message: "#Trait Kjos\\\\Orchestra\\\\Facades\\\\Concerns\\\\InterractWithServiceProvider is used zero times#"
 
     checkMissingCallableSignature: false
