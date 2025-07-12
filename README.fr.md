@@ -87,16 +87,16 @@ Le fournisseur de services est le noyau central qui initialise et résout le con
 ## Commandes Artisan
 
 ### Installer le locataire principal
-`php artisan orchestra:install the_master_tenant_name --domain=master_tenant_domain` --driver=[mysql|pgsql]
+`php artisan orchestra:install the_master_tenant_name --domain=master_tenant_domain --driver=[mysql|pgsql]`
 
 ### ❌ Désinstaller le locataire principal
-`php artisan orchestra:uninstall the_master_tenant_name --driver=[mysql|pgsql]
+`php artisan orchestra:uninstall the_master_tenant_name --driver=[mysql|pgsql]`
 
 ### ➕ Créer un nouveau locataire
-`php artisan orchestra:create the_tenant_name --domain=the_tenant_domain --driver=[mysql|pgsql] --migrate
+`php artisan orchestra:create the_tenant_name --domain=the_tenant_domain --driver=[mysql|pgsql] --migrate`
 
 ### ➖ Supprimer un locataire
-`php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]
+`php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]`
 
 ### 🧾 Options disponibles
 | Options | Description |
