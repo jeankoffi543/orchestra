@@ -1,124 +1,168 @@
-# 3kjos-command for Laravel
 
-# OVERVIEW
-3kjos Command is a Laravel package that provides a powerful command-line tool to quickly generate a complete API structure, including routes, controllers, models, form requests, resources, migrations, and tests. With just one command, you can scaffold an entire API module, significantly reducing development time and maintaining consistency across your project.
+[![Tests](https://github.com/jeankoffi543/orchestra/actions/workflows/tests.yml/badge.svg)](https://github.com/jeankoffi543/orchestra/actions)
+![Packagist Version](https://img.shields.io/packagist/v/kjos/orchestra)
+![PHP](https://img.shields.io/badge/PHP-%5E8.0-blue)
+![License](https://img.shields.io/github/license/jeankoffi543/orchestra)
 
-# Features
 
-### Automatic API Generation
- - Adds API route to ``api.php`` (index, show, store, put, delete)
- - Generates a ``controller`` with all CRUD methods.
- - Add  ``resource class`` to structure API responses.
- - Builds a ``model`` with its table name, fillable fields, and relationships.
- - Generates a ``form request class`` with validation rules.
- - Creates a ``migration`` with predefined fields.
- - Generates ``feature tests`` for the API.
+## 🌐 Multilangue | Multilingual
 
-### Error Handling with ``errorHandler`` (Optional)
- - Centralizes error management across controllers.
- - Handles ``ModelNotFoundException``, ``QueryException``, and other errors.
- - Ensures proper HTTP responses: ``404``, ``403``, ``422``, ``500``.
+- 🇫🇷 [Version Française](README.fr.md)
+- 🇬🇧 [English Version](README.md)
 
-### Centralized Controller Logic (Optional)
- - Uses a ``Central`` service to handle CRUD operations.
- - Reduces code duplication by managing common logic in one place.
+## 🇬🇧 English
 
-### Factory Generation
-
- - Creates a ``factory`` for the model with relevant attributes.
- - Simplifies database seeding and testing.
-
+# kjos orchestra
+A powerful multi-tenancy manager for Laravel, with built-in support for domain isolation, database separation, and automated Apache virtual host configuration.
 
 # Installation
+`composer require kjos/orchestra`
 
-```composer require kjos/command```
+## Master tenant installation
+Before beginning you must install the master tanant. 
+We will ask you to configure the `User` wo will use for virtuals hosts creation.
+When `User` is configure, a shedule task is creating in your crontab table, you can type `crontab -e` to see it.
+The shedule task will use your `User` with it privileges to automate the creation et configuration of your `virtualhost`.
+`virtualhosts` are configured in /etc/apache2/sites-available directory.
+
+# Concept
+`kjos/orchestra` simplifies the management of multi-tenant applications by providing:
+
+- Independent databases per tenant
+
+- Separate route files, config, and storage per tenant
+
+- Automatic setup of Apache virtual hosts
+
+- Easy tenant lifecycle management via Artisan commands
+
+It’s ideal for SaaS platforms or systems requiring strict tenant isolation.
 
 
-# Usage
 
-```php artisan kjos:make:api name```
+# Getting Started
 
- - Replace ``name`` with the desired API entity (e.g., ``user``, ``product``).
- - This will create all necessary files and append routes automatically.
+## Master Tenant Setup
+Before adding tenants, you must install and configure the master tenant.
 
-# Available Options
-| Option            | Alias | Description |
-|:-----------------:|:-----:|-------------|
-| `--force`         | `-f`  | Overwrites existing files if they exist. |
-| `--errorhandler`  | `-er` | Enables centralized error handling for controller methods. |
-| `--centralize`    | `-c`  | Uses a central class to manage CRUD operations. |
-| `--factory`       |       | Generates a model factory with sample data. |
-| `--test`          |       | Generates tests files relative to a madel. |
+## What happens during setup?
+You’ll configure a system User that will be used to manage Apache virtual hosts.
 
-# Example with Options
+A scheduled task will be added to your crontab to automate virtual host creation.
 
-```php artisan kjos:make:api User --force --errorhandler --centralize --factory --test```
+Apache virtual hosts are stored in:
+/etc/apache2/sites-available/
 
-This command will:
-✅ Overwrite existing files.
-✅ Enable centralized error handling.
-✅ Use a central CRUD management system.
-✅ Generate a factory for the User model.
+## Installation Steps
+1. Create & configure the master tenant
 
-# Example Generated Code
+2. Publish the config file:
+```
+php artisan vendor:publish --tag=orchestra-config
+```
+3. Create the database for the master tenant
 
-### Controller with Error Handling (--errorhandler or -er)
-```php
- public function store(UserRequest $request)
-{
-    return $this->errorHandler(function () use ($request) {
-      return new UserResource(User::create($request->validated()));
-    });
-}
+4. Add the tenant to the .tenants file at your project root
+
+5. Create the site/ directory, which will contain subfolders for each tenant
+
+6. Link each tenant's /public directory to your Laravel public root
+
+7. Configure the virtual host:
+
+  - Symlink: /var/www/html/{tenant-domain} → project/site/{tenant-name}
+
+  - Apache config: /etc/apache2/sites-available/{tenant-domain}.conf
+
+  - Log file: /var/log/apache2/{tenant-domain}.log
+
+8. Enable the virtual host:
+```
+sudo a2ensite {tenant-domain}.conf
+sudo systemctl reload apache2
+```
+9. Register the service provider in config/app.php:
+```
+App\Providers\TenantServiceProvider::class,
 ```
 
-**Error Handling with errorHandler Method**
-The `errorHandler` method is a utility function designed to execute a callable while handling various exceptions that may occur. It provides robust error handling and ensures that different types of errors are appropriately managed.
-
-- **ModelNotFoundException**: If a model is not found, the method returns a `404 Not Found` response.
-
-- **QueryException**: For security, reasons catches database query errors and returns a 404 Not Found response.
-
-- **General Exceptions**: The method checks the exception code and handles it as follows:
-  - `404`: Returns a `404 Not Found` response.
-  - `403`: Returns a `403 Forbidden` response with the error message.
-  - `422`: Returns a `403 Forbidden` response with the error message.
-  - `Other errors`: A generic `500 Internal Server Error` response is returned with the exception message.
-
-This approach ensures that your application responds to errors with proper HTTP status codes, making error handling more predictable and user-friendly.
+The `TenantServiceProvider` is the central kernel that initializes and resolves tenant-specific context and configuration.
 
 
-### Controller with Centralized Logic (--centralize or -c)
-```php
- public function store(Request $request)
-{
-   return $this->errorHandler(function () use ($request) {
-      return Central::store(User::class, UserResource::class, $request->validated());
-  });
-}
+## Artisan Commands
+
+### Install Master Tenant
+`php artisan orchestra:install the_master_tenant_name --domain=master_tenant_domain` --driver=[mysql|pgsql]
+
+### ❌ Uninstall Master Tenant
+`php artisan orchestra:uninstall the_master_tenant_name --driver=[mysql|pgsql]
+
+### ➕ Create a New Tenant
+`php artisan orchestra:create the_tenant_name --domain=the_tenant_domain --driver=[mysql|pgsql] --migrate
+
+
+### ➖ Delete a Tenant
+`php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]
+
+
+### 🧾 Available Options
+| Option            | Description                                         |
+|:-----------------:|:---------------------------------------------------:|
+| `--domain`        | The domain of the tenant                            |      |
+| `--driver`        | Database driver `pgsql` or `mysql`                  |
+| `--migrate`       | Either migrate the fresh tenant database or not     |               |
+
+
+###  Additional Features
+Each tenant has its own:
+
+- `routes` (API, web, console)
+
+- `database`
+
+- `storage` & `cache`
+
+- `config` context
+
+Crontab automation for managing virtual hosts
+
+Support for Laravel testing with tenant isolation
+
+Dynamic tenant discovery via `.tenants` file
+
+.
+
+# 📁 Directory Structure
+```
+project-root/
+├── site/
+│   ├── master/
+│   │   └── routes/
+│   └── tenant-a/
+│   |   └── routes/
+|   |__ tenant-b/
+|       |__routes/
+|
+├── .tenants
+├── config/orchestra.php
+├── app/Providers/TenantServiceProvider.php
 ```
 
-Centralized management of `index`, `show`, `store`, `update` and `delete` methods
+# 👤 Author
+Maintained by [Jean Koffi](https://www.linkedin.com/in/konan-kan-jean-sylvain-koffi-39970399/)
+
+# 📄 License
+MIT © kjos/orchestra
 
 
-### -Generated Factory (--factory)
-```php
-public function definition(): array
-{
-   return [
-      'client_id' => 11,
-      'price' => 6765610,
-      'partner_id' => 25,
-   ];
-}
-```
+# 🤝 Call for contributions
+This project is open to contributions!
+Are you a developer, passionate about Laravel, or interested in multi-tenant architecture?
 
-# Why Use 3kjos Command?
-🚀 Save Development Time – Automates repetitive tasks.
-✅ Consistency – Ensures a structured and uniform API architecture.
-🔧 Customizable – Offers multiple options for error handling, centralization, and testing.
-📦 Scalable – Easily extendable for future enhancements.
+- Fork the project
 
-# License
-This package is open-source and available under the MIT License. 🚀
-# orchestra
+- Create a branch (koor/my-feature)
+
+- Make a PR 🧪
+
+There are many other command for additionally configuration.
