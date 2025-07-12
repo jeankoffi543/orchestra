@@ -92,17 +92,17 @@ The `TenantServiceProvider` is the central kernel that initializes and resolves 
 ## Artisan Commands
 
 ### Install Master Tenant
-`php artisan orchestra:install the_master_tenant_name --domain=master_tenant_domain` --driver=[mysql|pgsql]
+`php artisan orchestra:install the_master_tenant_name --domain=master_tenant_domain --driver=[mysql|pgsql]`
 
 ### ❌ Uninstall Master Tenant
-`php artisan orchestra:uninstall the_master_tenant_name --driver=[mysql|pgsql]
+`php artisan orchestra:uninstall the_master_tenant_name --driver=[mysql|pgsql]`
 
 ### ➕ Create a New Tenant
-`php artisan orchestra:create the_tenant_name --domain=the_tenant_domain --driver=[mysql|pgsql] --migrate
+`php artisan orchestra:create the_tenant_name --domain=the_tenant_domain --driver=[mysql|pgsql] --migrate`
 
 
 ### ➖ Delete a Tenant
-`php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]
+`php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]`
 
 
 ### 🧾 Available Options
