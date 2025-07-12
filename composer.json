@@ -1,5 +1,6 @@
 {
   "name": "kjos/orchestra",
+  "version": "1.0.0",
   "description": "Orchestra tool for Laravel and other",
   "license": "MIT",
   "authors": [
@@ -11,10 +12,7 @@
   "repositories": [
     {
       "type": "vcs",
-      "url": "https://github.com/jeankoffi543/3kjos-command.git",
-      "options": {
-        "symlink": true
-      }
+      "url": "https://github.com/jeankoffi543/orchestra.git"
     }
   ],
   "require": {
