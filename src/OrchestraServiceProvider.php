@@ -13,8 +13,8 @@ class OrchestraServiceProvider extends ServiceProvider
         // Load routes, views, migrations, etc.
         $schedule = $this->app->make(Schedule::class);
         $schedule->command('orchestra:virtualhost:scanner')
-        ->everySecond()
-        ->withoutOverlapping(5);
+            ->everySecond()
+            ->withoutOverlapping(5);
         // $schedule->command('orchestra:reload-domain')->everyMinute();
     }
 
@@ -40,6 +40,15 @@ class OrchestraServiceProvider extends ServiceProvider
             \Kjos\Orchestra\Commands\RemoveVirtualHostsCommand::class,
             \Kjos\Orchestra\Commands\DatabaseCreateCommand::class,
         ]);
+
+        $this->app->extend(\Illuminate\Database\Console\Seeds\SeedCommand::class, function () {
+            return new \Kjos\Orchestra\Commands\SeedCommand($this->app['db']);
+        });
+
+        $this->app->extend(\Illuminate\Database\Console\Migrations\MigrateCommand::class, function () {
+            return new \Kjos\Orchestra\Commands\MigrateCommand($this->app['migrator'], $this->app['events']);
+        });
+
         //Register facade
         $this->app->singleton('oor', function ($app) {
             return new \Kjos\Orchestra\Facades\Orchestra($app);
