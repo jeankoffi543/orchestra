@@ -34,7 +34,7 @@ class TenantStorageManager
         $link   = public_path("storage/tenants/{$tenant}");
 
         // Créer le dossier s’il n'existe pas/ si on est en test
-        if (!\file_exists(\dirname($link))) {
+        if (!\file_exists(\dirname($target))) {
             \mkdir(\dirname($target), 0777, true);
         }
 
