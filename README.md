@@ -108,9 +108,19 @@ The `TenantServiceProvider` is the central kernel that initializes and resolves 
 ### 🧾 Available Options
 | Option            | Description                                         |
 |:-----------------:|:---------------------------------------------------:|
-| `--domain`        | The domain of the tenant                            |      |
+| `--domain`        | The domain of the tenant                            |      
 | `--driver`        | Database driver `pgsql` or `mysql`                  |
-| `--migrate`       | Either migrate the fresh tenant database or not     |               |
+| `--migrate`       | Either migrate the fresh tenant database or not     |       
+| 
+
+#  Laravel natif command
+### ➖ Migrate or seed a specific tenant
+`php artisan migrate --tenant=tenant_name`
+`php artisan db:seed --class=ExempleSeeder --tenant=tenant_name`
+
+### ➖ Migrate or seed a specific all tenants
+`php artisan migrate --tenant`
+`php artisan db:seed --class=ExempleSeeder --tenant`
 
 
 ###  Additional Features
