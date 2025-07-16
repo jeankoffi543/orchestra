@@ -11,7 +11,7 @@ class TenantStorageManager
     {
         $tenant = Oor::getCurrent(); // Utilise ta méthode actuelle (session, middleware, etc.)
 
-        $root = base_path("site/{$tenant}/storage/app/public");
+        $root = OrchestraPath::tenantStorage($tenant);
         $url  = config('app.url') . "/storage/tenants/{$tenant}";
 
         if (!\is_dir($root)) {
@@ -30,8 +30,28 @@ class TenantStorageManager
 
     protected static function ensureSymlinkExists(string $tenant): void
     {
-        $target = base_path("site/{$tenant}/storage/app/public");
+        $target = OrchestraPath::tenantStorage($tenant);
         $link   = public_path("storage/tenants/{$tenant}");
+
+        // Créer le dossier s’il n'existe pas/ si on est en test
+        if (!\file_exists(\dirname($link))) {
+            \mkdir(\dirname($target), 0777, true);
+        }
+
+        // on stop si on est en test
+        if (OrchestraPath::isTesting()) {
+            return;
+        }
+
+        if (!\file_exists(\dirname($link))) {
+            \mkdir(\dirname($link), 0777, true);
+        }
+
+        // Vérifie que le fichier cible existe ou non
+        if (\file_exists($target) && !\file_exists($link)) {
+            \symlink($target, $link);
+        }
+
 
         if (!\file_exists($link)) {
             \symlink($target, $link);

@@ -9,16 +9,37 @@
 |
 */
 
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
+use Kjos\Orchestra\Contexts\OrchestraPath;
 use Kjos\Orchestra\Facades\Oor;
 
 \pest()->extend(Kjos\Orchestra\Contexts\MasterTestCase::class)
+    ->afterEach(function () {
+        File::deleteDirectory(OrchestraPath::tenant(getCurrent()));
+    })
     ->group('master')->in('Feature/Master');
 
 \pest()->extend(Kjos\Orchestra\Contexts\SlaveTestCase::class)
     ->afterEach(function () {
-        Oor::cleartenantTesting(getenv('SLAVE_APP_NAME'), getenv('SLAVE_APP_URL'));
+        Oor::cleartenantTesting(\getenv('SLAVE_APP_NAME'), \getenv('SLAVE_APP_URL'));
     })
     ->group('slave')->in('Feature/Slave');
+
+function generateUploadedFile()
+{
+    return UploadedFile::fake()->image('image.png');
+}
+
+function getCurrent()
+{
+    return Oor::getCurrent();
+}
+
+function getMasterSitePublic()
+{
+    return OrchestraPath::tenantStorage(Oor::getCurrent());
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -30,3 +51,4 @@ use Kjos\Orchestra\Facades\Oor;
 | to assert different things. Of course, you may extend the Expectation API at any time.
 |
 */
+
