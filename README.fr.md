@@ -99,11 +99,20 @@ Le fournisseur de services est le noyau central qui initialise et résout le con
 `php artisan orchestra:delete the_tenant_name --driver=[mysql|pgsql]`
 
 ### 🧾 Options disponibles
-| Options | Description |
-|:-----------------:|:--------------------------------------------------:|
-| `--domain` | Domaine du locataire | |
-| `--driver` | Pilote de base de données `pgsql` ou `mysql` |
-| `--migrate` | Migrer ou non la nouvelle base de données du locataire | |
+| Options    | Description             
+|:---------------------------------------------------------------------:|
+| `--domain` | Domaine du locataire                                     |
+| `--driver` | Pilote de base de données `pgsql` ou `mysql`             |
+| `--migrate`| Migrer ou non la nouvelle base de données du locataire   |
+
+#  Command native Laravel
+### ➖ Migrate ou seed un tenant spécifique
+`php artisan migrate --tenant=tenant_name`
+`php artisan db:seed --class=ExempleSeeder --tenant=tenant_name`
+
+### ➖ Migrate or seed ou seed tous les tenant
+`php artisan migrate --tenant`
+`php artisan db:seed --class=ExempleSeeder --tenant`
 
 ### Fonctionnalités supplémentaires
 Chaque locataire possède ses propres :
