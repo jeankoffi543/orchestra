@@ -35,6 +35,10 @@ trait InterractWithServiceProvider
         $file = data_get($data, $fileKey);
 
         if (! $file instanceof UploadedFile) {
+            if (! $file) {
+                return $data;
+            }
+
             $data[$fileKey] = $file;
 
             return $data;

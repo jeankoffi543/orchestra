@@ -36,16 +36,16 @@ class Deployer extends Shell
         $this->basePath        = \rtrim(base_path(), '/');
         $this->currentsystUser = \get_current_user();
 
-        $this->mv        = \trim(\shell_exec('which mv'));
-        $this->rm        = \trim(\shell_exec('which rm'));
-        $this->a2ensite  = \trim(\shell_exec('which a2ensite'));
-        $this->systemctl = \trim(\shell_exec('which systemctl'));
-        $this->ln        = \trim(\shell_exec('which ln'));
-        $this->a2dissite = \trim(\shell_exec('which a2dissite'));
-        $this->mkdir     = \trim(\shell_exec('which mkdir'));
-        $this->bash      = \trim(\shell_exec('which bash'));
-        $this->chown     = \trim(\shell_exec('which chown'));
-        $this->chmod     = \trim(\shell_exec('which chmod'));
+        $this->mv        = \trim(\shell_exec('which mv')) . ',';
+        $this->rm        = \trim(\shell_exec('which rm')) . ',';
+        $this->a2ensite  = \trim(\shell_exec('which a2ensite')) . ',';
+        $this->systemctl = \trim(\shell_exec('which systemctl')) . ',';
+        $this->ln        = \trim(\shell_exec('which ln')) . ',';
+        $this->a2dissite = \trim(\shell_exec('which a2dissite')) . ',';
+        $this->mkdir     = \trim(\shell_exec('which mkdir')) . ',';
+        $this->bash      = \trim(\shell_exec('which bash')) . ',';
+        $this->chown     = \trim(\shell_exec('which chown')) . ',';
+        $this->chmod     = \trim(\shell_exec('which chmod')) . ',';
         $this->find      = \trim(\shell_exec('which find'));
     }
 
@@ -148,7 +148,7 @@ class Deployer extends Shell
 
     public function userCommand(): void
     {
-        $this->addCode("echo '{$this->currentsystUser} ALL=(ALL) NOPASSWD: {$this->mv}, {$this->rm}, {$this->a2ensite}, {$this->a2dissite}, {$this->systemctl}, {$this->ln}, {$this->mkdir}, {$this->chown}, {$this->chmod}, {$this->find}' | sudo tee -a /etc/sudoers.d/deployer")
+        $this->addCode("echo '{$this->currentsystUser} ALL=(ALL) NOPASSWD: {$this->mv} {$this->rm} {$this->a2ensite} {$this->a2dissite} {$this->systemctl} {$this->ln} {$this->mkdir} {$this->chown} {$this->chmod} {$this->find}' | sudo tee -a /etc/sudoers.d/deployer")
             ->execute();
     }
 
@@ -393,6 +393,8 @@ class Deployer extends Shell
             "sudo chown {$this->currentsystUser}:{$this->currentsystUser} {$this->scriptPath}",
             // S'assurer que les scripts dans vendor/bin sont exécutables
             // "sudo find $base/vendor/bin -type f -exec chmod +x {} +",
+
+            "sudo chown -R {$this->currentsystUser}:$wwwUser $base/site/.tenants",
         ];
 
         foreach ($commands as $cmd) {
