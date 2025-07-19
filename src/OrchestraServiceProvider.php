@@ -39,6 +39,7 @@ class OrchestraServiceProvider extends ServiceProvider
             \Kjos\Orchestra\Commands\MakeVirtualHostScanCommand::class,
             \Kjos\Orchestra\Commands\RemoveVirtualHostsCommand::class,
             \Kjos\Orchestra\Commands\DatabaseCreateCommand::class,
+            \Kjos\Orchestra\Commands\FreshCommand::class,
         ]);
 
         $this->app->extend(\Illuminate\Database\Console\Seeds\SeedCommand::class, function () {
@@ -47,6 +48,10 @@ class OrchestraServiceProvider extends ServiceProvider
 
         $this->app->extend(\Illuminate\Database\Console\Migrations\MigrateCommand::class, function () {
             return new \Kjos\Orchestra\Commands\MigrateCommand($this->app['migrator'], $this->app['events']);
+        });
+
+        $this->app->extend(\Illuminate\Database\Console\Migrations\FreshCommand::class, function () {
+            return new \Kjos\Orchestra\Commands\FreshCommand();
         });
 
         //Register facade

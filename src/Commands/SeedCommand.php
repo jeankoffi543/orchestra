@@ -64,4 +64,43 @@ class SeedCommand extends BaseSeedCommand
         // Comportement par défaut si --tenants n'est pas spécifié
         return parent::handle();
     }
+
+    /**
+     * Get a seeder instance from the container.
+     *
+     * @return \Illuminate\Database\Seeder
+     */
+    protected function getSeeder()
+    {
+        $class   = $this->input->getArgument('class') ?? $this->input->getOption('class');
+        $tenants = $this->input->getOption('tenants');
+
+
+        if (!empty($tenants) && $tenant = \current($tenants)) {
+            $path  = Oor::isMaster($tenant) ? '' : 'Tenants\\';
+            $class = $this->processWithPath($class, $path);
+        } else {
+            $class = $this->processWithPath($class);
+        }
+
+        return $this->laravel->make($class)
+            ->setContainer($this->laravel)
+            ->setCommand($this);
+    }
+
+    private function processWithPath(mixed $class, string $path = ''): mixed
+    {
+        if (! \str_contains($class, '\\')) {
+            $class = "Database\\Seeders\\$path" . $class;
+        } else {
+            $class = "Database\\Seeders\\{$path}DatabaseSeeder";
+        }
+        if (
+            $class === "Database\\Seeders\\{$path}DatabaseSeeder" && ! \class_exists($class)
+        ) {
+            $class = $path . 'DatabaseSeeder';
+        }
+
+        return $class;
+    }
 }

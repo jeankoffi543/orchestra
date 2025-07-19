@@ -124,6 +124,8 @@ class TenantManager
             'cache.default'  => $env['CACHE_STORE']      ?? 'file',
             'session.driver' => $env['SESSION_DRIVER']   ?? 'file',
 
+            'database.migrations_paths' => [OrchestraPath::migrations($tenant)],
+
             // etc... toutes les configs utiles à ton app
         ];
         $this->current = new TenantContext($tenant, $env, $config);
@@ -148,6 +150,10 @@ class TenantManager
             'filesystems.disks.local.root'        => storage_path('app/private'),
             'filesystems.disks.public.root'       => storage_path('app/public'),
             'filesystems.disks.public.url'        => env('APP_URL') . '/storage',
+
+
+            // etc... toutes les configs utiles à ton app
+
             // etc.
         ];
 

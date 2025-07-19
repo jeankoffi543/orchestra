@@ -3,21 +3,14 @@
 namespace Kjos\Orchestra\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Database\Console\Migrations\MigrateCommand as BaseMigrateCommand;
-use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Database\Console\Migrations\FreshCommand as BaseFreshCommand;
 use Kjos\Orchestra\Contexts\OrchestraPath;
 use Kjos\Orchestra\Contexts\TenantContext;
 use Kjos\Orchestra\Contexts\TenantManager;
 use Kjos\Orchestra\Facades\Oor;
 
-class MigrateCommand extends BaseMigrateCommand
+class FreshCommand extends BaseFreshCommand
 {
-    public function __construct(Migrator $migrator, Dispatcher $dispatcher)
-    {
-        parent::__construct($migrator, $dispatcher);
-    }
-
     protected function configure(): void
     {
         parent::configure();
@@ -28,7 +21,7 @@ class MigrateCommand extends BaseMigrateCommand
                 'tenants',
                 null,
                 \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL | \Symfony\Component\Console\Input\InputOption::VALUE_IS_ARRAY,
-                'Tenant database connections to seed'
+                'Tenant database connections to refresh'
             )
         );
     }
@@ -47,9 +40,9 @@ class MigrateCommand extends BaseMigrateCommand
                 return parent::handle();
             });
         } elseif (! empty($tenants) && !\current($tenants)) {
-            $response = $this->confirm('You are about to migrate all tenants. Are you sure?', false);
+            $response = $this->confirm('You are about to refresh all tenants. Are you sure?', false);
             if (! $response) {
-                $this->warn('Migration cancelled');
+                $this->warn('Command cancelled');
 
                 return Command::FAILURE;
             }

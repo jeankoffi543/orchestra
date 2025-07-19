@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Http\Response;
 use Kjos\Orchestra\Facades\Concerns\Installer;
 use Kjos\Orchestra\Facades\Concerns\RollbackManager;
+use Kjos\Orchestra\Facades\Oor;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'orchestra:uninstall')]
@@ -52,6 +53,14 @@ class UninstallTenantCommand extends Command
             $driver = $this->option('driver');
             $master = $this->argument('name');
             $driver = $driver ?? getDriver(base_path('.env'));
+
+            //check if is master
+            if (! Oor::isMaster($master)) {
+                runInConsole(fn () => $this->error('This is not the master tenant'));
+
+                return Command::FAILURE;
+            }
+
             $installer->prepareUnInstallation($master, $driver, $rollback, $this->output);
 
             // remove deployer

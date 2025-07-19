@@ -127,4 +127,13 @@ class Orchestra extends OperaBuilder
     {
         $this->restoreTenant($tenantName, $driver, $console);
     }
+
+    public function isMaster(?string $name = null): bool
+    {
+        $master = config('orchestra.master.name');
+
+        return app()->runningInConsole() ?
+            $name             === $master :
+            Oor::getCurrent() === $master;
+    }
 }

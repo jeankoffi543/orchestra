@@ -114,6 +114,14 @@ class Installer extends OperaBuilder
                 $rollback
             );
 
+            rollback_catch(
+                function () use ($rollback) {
+                    $this->makeSeeder();
+                    $rollback->add(fn () => $this->removeSeeder());
+                },
+                $rollback
+            );
+
             // format code
             \exec('./vendor/bin/pint ' . $this->getPintPaths(), $output, $status);
         } catch (\Exception $e) {
@@ -181,6 +189,14 @@ class Installer extends OperaBuilder
                 function () use ($rollback) {
                     $this->removeTest();
                     $rollback->add(fn () => $this->addTest());
+                },
+                $rollback
+            );
+
+            rollback_catch(
+                function () use ($rollback) {
+                    $this->removeSeeder();
+                    $rollback->add(fn () => $this->makeSeeder());
                 },
                 $rollback
             );
@@ -276,6 +292,33 @@ class Installer extends OperaBuilder
 
         if (File::exists($configPath)) {
             File::delete($configPath);
+        }
+    }
+
+    public function makeSeeder(): void
+    {
+        $seederPath        = 'seeders/Tenants/DatabaseSeeder.php';
+        $targetPath        = database_path($seederPath);
+        $moduleSeedersPath = module_path(".stub/database/{$seederPath}");
+
+        // Vérifie et crée le dossier parent si besoin
+        if (!File::exists(\dirname($targetPath))) {
+            File::makeDirectory(\dirname($targetPath), 0777, true); // true pour récursif
+        }
+
+        // Copie si le fichier n'existe pas déjà
+        if (!File::exists($targetPath)) {
+            File::copy($moduleSeedersPath, $targetPath);
+        }
+    }
+
+    public function removeSeeder(): void
+    {
+        $seederPath = 'seeders/Tenants/DatabaseSeeder.php';
+        $targetPath = database_path($seederPath);
+
+        if (File::exists($targetPath)) {
+            File::delete($targetPath);
         }
     }
 

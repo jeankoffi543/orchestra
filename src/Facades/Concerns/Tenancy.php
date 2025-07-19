@@ -761,7 +761,10 @@ class Tenancy
         LessTenancy::createTenantDatabase($credentials, $rollback, $exists);
 
         // Migrate tenant database
-        Artisan::call("orchestra:migrate $name");
+        // Artisan::call("orchestra:migrate $name");
+        Artisan::call('migrate', [
+            'tenants' => $name,
+        ]);
     }
 
     /**
