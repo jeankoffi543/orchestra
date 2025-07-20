@@ -131,7 +131,7 @@ class VritualHost extends Deployer
             $this->addCode("$this->scriptPath remove --conf {$this->confPrefix}{$this->domain}.conf --domain {$this->domain} --base-path {$basePath} --cron-log {$this->cronLogPath}")
                 ->execute();
 
-            removeFileSecurely($this->cronLogPath ?? '');
+            // removeFileSecurely($this->cronLogPath ?? '');
         }
     }
 

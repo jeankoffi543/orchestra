@@ -301,6 +301,9 @@ class Deployer extends Shell
                   sudo a2ensite $(basename "$CONF_PATH")
                   sudo systemctl reload apache2
 
+                  # migration de la base de données
+                  cd "$BASE_PATH" && /usr/bin/php artisan migrate --tenants="$NAME"
+
                echo "✅ Site $DOMAIN activé avec succès."
 
                echo "Fin ➤"

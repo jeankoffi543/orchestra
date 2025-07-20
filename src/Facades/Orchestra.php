@@ -128,11 +128,19 @@ class Orchestra extends OperaBuilder
         $this->restoreTenant($tenantName, $driver, $console);
     }
 
-    public function isMaster(?string $name = null): bool
+    /**
+     * Determine if the given tenant is the master tenant.
+     *
+     * @param string|null $name The name of the tenant to check.
+     * @param bool $force Force the check regardless of whether the app is running in the console.
+     *
+     * @return bool True if the tenant is the master tenant, false otherwise.
+     */
+    public function isMaster(?string $name = null, bool $force = false): bool
     {
         $master = config('orchestra.master.name');
 
-        return app()->runningInConsole() ?
+        return (app()->runningInConsole() || $force) ?
             $name             === $master :
             Oor::getCurrent() === $master;
     }
