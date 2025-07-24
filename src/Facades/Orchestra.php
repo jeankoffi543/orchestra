@@ -5,6 +5,7 @@ namespace Kjos\Orchestra\Facades;
 use Closure;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Foundation\Application;
+use Kjos\Orchestra\Contexts\TenantManager;
 
 class Orchestra extends OperaBuilder
 {
@@ -143,5 +144,15 @@ class Orchestra extends OperaBuilder
         return (app()->runningInConsole() || $force) ?
             $name             === $master :
             Oor::getCurrent() === $master;
+    }
+
+    public function runFor(string $name, Closure $callback): void
+    {
+        try {
+            $tenantManager = new TenantManager();
+            $tenantManager->runFor($name, $callback);
+        } catch (\Exception $e) {
+            throw new \Exception($e);
+        }
     }
 }

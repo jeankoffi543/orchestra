@@ -2,7 +2,9 @@
 
 namespace Kjos\Orchestra\Contexts;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class TenantManager
 {
@@ -56,35 +58,35 @@ class TenantManager
         $config = [
             // pgsql
             'database.connections.pgsql.driver'   => 'pgsql',
-            'database.connections.pgsql.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.pgsql.port'     => $env['DB_PORT']     ?? '5432',
-            'database.connections.pgsql.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.pgsql.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.pgsql.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.pgsql.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.pgsql.port'     => $env['DB_PORT']     ?? env('DB_PORT', '5432'),
+            'database.connections.pgsql.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.pgsql.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.pgsql.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
             // pgsql test
             'database.connections.pgsql_test.driver'   => 'pgsql',
-            'database.connections.pgsql_test.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.pgsql_test.port'     => $env['DB_PORT']     ?? '5432',
-            'database.connections.pgsql_test.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.pgsql_test.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.pgsql_test.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.pgsql_test.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.pgsql_test.port'     => $env['DB_PORT']     ?? env('DB_PORT', '5432'),
+            'database.connections.pgsql_test.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.pgsql_test.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.pgsql_test.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
             // mysql
             'database.connections.mysql.driver'   => 'mysql',
-            'database.connections.mysql.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.mysql.port'     => $env['DB_PORT']     ?? '3306',
-            'database.connections.mysql.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.mysql.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.mysql.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.mysql.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.mysql.port'     => $env['DB_PORT']     ?? env('DB_PORT', '3306'),
+            'database.connections.mysql.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.mysql.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.mysql.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
             // mysql test
             'database.connections.mysql_test.driver'   => 'mysql',
-            'database.connections.mysql_test.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.mysql_test.port'     => $env['DB_PORT']     ?? '3306',
-            'database.connections.mysql_test.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.mysql_test.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.mysql_test.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.mysql_test.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.mysql_test.port'     => $env['DB_PORT']     ?? env('DB_PORT', '3306'),
+            'database.connections.mysql_test.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.mysql_test.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.mysql_test.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
             // sqlite
             'database.connections.sqlite.driver'   => 'sqlite',
@@ -96,19 +98,19 @@ class TenantManager
 
             // sqlsrv
             'database.connections.sqlsrv.driver'   => 'sqlsrv',
-            'database.connections.sqlsrv.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.sqlsrv.port'     => $env['DB_PORT']     ?? '1433',
-            'database.connections.sqlsrv.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.sqlsrv.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.sqlsrv.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.sqlsrv.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.sqlsrv.port'     => $env['DB_PORT']     ?? env('DB_PORT', '1433'),
+            'database.connections.sqlsrv.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.sqlsrv.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.sqlsrv.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
             // sqlsrv test
             'database.connections.sqlsrv_test.driver'   => 'sqlsrv',
-            'database.connections.sqlsrv_test.host'     => $env['DB_HOST']     ?? '127.0.0.1',
-            'database.connections.sqlsrv_test.port'     => $env['DB_PORT']     ?? '1433',
-            'database.connections.sqlsrv_test.database' => $env['DB_DATABASE'] ?? 'forge',
-            'database.connections.sqlsrv_test.username' => $env['DB_USERNAME'] ?? 'forge',
-            'database.connections.sqlsrv_test.password' => $env['DB_PASSWORD'] ?? '',
+            'database.connections.sqlsrv_test.host'     => $env['DB_HOST']     ?? env('DB_HOST', '127.0.0.1'),
+            'database.connections.sqlsrv_test.port'     => $env['DB_PORT']     ?? env('DB_PORT', '1433'),
+            'database.connections.sqlsrv_test.database' => $env['DB_DATABASE'] ?? env('DB_DATABASE', 'forge'),
+            'database.connections.sqlsrv_test.username' => $env['DB_USERNAME'] ?? env('DB_USERNAME', 'forge'),
+            'database.connections.sqlsrv_test.password' => $env['DB_PASSWORD'] ?? env('DB_PASSWORD', ''),
 
 
             'app.key' => $env['APP_KEY'] ?? 'base64:' . \base64_encode(\random_bytes(32)),
@@ -120,9 +122,9 @@ class TenantManager
             'filesystems.disks.public.root' => base_path("site/{$tenant}/storage/app/public"),
             'filesystems.disks.public.url'  => \rtrim($env['APP_URL'] ?? 'http://localhost', '/') . "/storage/{$tenant}",
 
-            'queue.default'  => $env['QUEUE_CONNECTION'] ?? 'sync',
-            'cache.default'  => $env['CACHE_STORE']      ?? 'file',
-            'session.driver' => $env['SESSION_DRIVER']   ?? 'file',
+            'queue.default'  => $env['QUEUE_CONNECTION'] ?? env('QUEUE_CONNECTION'),
+            'cache.default'  => $env['CACHE_STORE']      ?? env('CACHE_STORE'),
+            'session.driver' => $env['SESSION_DRIVER']   ?? env('SESSION_DRIVER'),
 
             'database.migrations_paths' => [OrchestraPath::migrations($tenant)],
 
@@ -181,7 +183,13 @@ class TenantManager
     public function runFor(string $tenant, \Closure $callback): mixed
     {
         $this->switchTo($tenant);
+        Log::info('config = ' . config('database.connections.pgsql.database'));
+        Log::info('🎯 Callback: DB courante = ' . DB::connection()->getDatabaseName());
 
         return $callback($this->current);
+
+        // $this->rebase($tenant);
+
+        // return $result;
     }
 }
