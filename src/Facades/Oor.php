@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static void restore(string $tenantName, string $driver = 'pgsql', \Illuminate\Console\OutputStyle $console)
  * @method static array<string, string> getTenants()
  * @method static bool isMaster(string $name)
+ * @method static void runFor(string $name, \Closure $callback)
  * @see \App\Providers\Facades\Orchestra
  */
 
