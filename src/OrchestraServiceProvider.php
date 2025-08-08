@@ -3,6 +3,10 @@
 namespace Kjos\Orchestra;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Queue\QueueManager;
 use Illuminate\Support\ServiceProvider;
 use Kjos\Orchestra\Contexts\TenantManager;
 
@@ -40,6 +44,7 @@ class OrchestraServiceProvider extends ServiceProvider
             \Kjos\Orchestra\Commands\RemoveVirtualHostsCommand::class,
             \Kjos\Orchestra\Commands\DatabaseCreateCommand::class,
             \Kjos\Orchestra\Commands\FreshCommand::class,
+            \Kjos\Orchestra\Commands\OrchestraWorkCommand::class,
         ]);
 
         $this->app->extend(\Illuminate\Database\Console\Seeds\SeedCommand::class, function () {
@@ -53,6 +58,19 @@ class OrchestraServiceProvider extends ServiceProvider
         $this->app->extend(\Illuminate\Database\Console\Migrations\FreshCommand::class, function () {
             return new \Kjos\Orchestra\Commands\FreshCommand();
         });
+
+        $this->app->extend(\Illuminate\Queue\Console\WorkCommand::class, function () {
+            $manager              = $this->app->make(QueueManager::class);
+            $events               = $this->app->make(Dispatcher::class);
+            $cache                = $this->app->make(Repository::class);
+            $exceptionHandler     = $this->app->make(ExceptionHandler::class);
+            $isDownForMaintenance = fn () => $this->app->isDownForMaintenance();
+
+            $worker = new \Illuminate\Queue\Worker($manager, $events, $exceptionHandler, $isDownForMaintenance);
+
+            return new \Kjos\Orchestra\Commands\WorkCommand($worker, $cache);
+        });
+
 
         //Register facade
         $this->app->singleton('oor', function ($app) {
