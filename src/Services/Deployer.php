@@ -99,33 +99,83 @@ class Deployer extends Shell
         $this->removeScript();
     }
 
-    public function crontab(bool $remove = false): void
-    {
-        $cronCmd = "/usr/bin/php {$this->basePath}/artisan schedule:run";
-        // $cronLine = "* * * * * $cronCmd >> {$this->cronLogPath} 2>&1";
-        $cronLine = "* * * * * $cronCmd";
+    // public function crontab(bool $remove = false): void
+    // {
+    //     $cronCmd = "/usr/bin/php {$this->basePath}/artisan schedule:run";
+    //     // $cronLine = "* * * * * $cronCmd >> {$this->cronLogPath} 2>&1";
+    //     $cronLine = "* * * * * $cronCmd";
 
-        // Lire la crontab actuelle
+    //     // Lire la crontab actuelle
+    //     $currentCrontab = \shell_exec('crontab -l 2>/dev/null') ?? '';
+
+    //     if ($remove) {
+    //         $newCrontab = collect(\explode("\n", $currentCrontab))
+    //             ->reject(fn ($line) => \str_contains($line, $cronCmd))
+    //             ->implode("\n");
+
+    //         \file_put_contents('/tmp/mycron', \trim($newCrontab) . PHP_EOL);
+    //         \exec('crontab /tmp/mycron');
+    //         \unlink('/tmp/mycron');
+
+    //         return;
+    //     }
+
+    //     if (!\str_contains($currentCrontab, $cronCmd)) {
+    //         $newCrontab = $currentCrontab . PHP_EOL . $cronLine . PHP_EOL;
+    //         \file_put_contents('/tmp/mycron', \trim($newCrontab) . PHP_EOL);
+    //         \exec('crontab /tmp/mycron');
+    //         \unlink('/tmp/mycron');
+    //     }
+    // }
+
+    /**
+     * Manages the crontab for the application.
+     *
+     * If $remove is true, removes the specified commands from the crontab.
+     * Otherwise, adds the commands to the crontab if they do not already exist.
+     *
+     * @param bool $remove Whether to remove the commands from the crontab.
+     * @param array<string> $commands The commands to add or remove from the crontab.
+     * @return void
+     */
+    public function crontab(bool $remove = false, array $commands = []): void
+    {
+        // Commandes artisan par défaut
+        if (empty($commands)) {
+            $commands = [
+                "/usr/bin/php {$this->basePath}/artisan schedule:run",
+                "/usr/bin/php {$this->basePath}/artisan orchestra:queue:work",
+            ];
+        }
+
+        // Lire crontab actuelle
         $currentCrontab = \shell_exec('crontab -l 2>/dev/null') ?? '';
 
-        if ($remove) {
-            $newCrontab = collect(\explode("\n", $currentCrontab))
-                ->reject(fn ($line) => \str_contains($line, $cronCmd))
-                ->implode("\n");
+        $lines = collect(\explode("\n", $currentCrontab));
 
-            \file_put_contents('/tmp/mycron', \trim($newCrontab) . PHP_EOL);
+        if ($remove) {
+            foreach ($commands as $cmd) {
+                $lines = $lines->reject(fn ($line) => \str_contains($line, $cmd));
+            }
+
+            \file_put_contents('/tmp/mycron', \trim($lines->implode("\n")) . PHP_EOL);
             \exec('crontab /tmp/mycron');
             \unlink('/tmp/mycron');
 
             return;
         }
 
-        if (!\str_contains($currentCrontab, $cronCmd)) {
-            $newCrontab = $currentCrontab . PHP_EOL . $cronLine . PHP_EOL;
-            \file_put_contents('/tmp/mycron', \trim($newCrontab) . PHP_EOL);
-            \exec('crontab /tmp/mycron');
-            \unlink('/tmp/mycron');
+        foreach ($commands as $cmd) {
+            $cronLine = "* * * * * $cmd";
+
+            if (!$lines->contains(fn ($line) => \str_contains($line, $cmd))) {
+                $lines->push($cronLine);
+            }
         }
+
+        \file_put_contents('/tmp/mycron', \trim($lines->implode("\n")) . PHP_EOL);
+        \exec('crontab /tmp/mycron');
+        \unlink('/tmp/mycron');
     }
 
     public function removeScript(): void
