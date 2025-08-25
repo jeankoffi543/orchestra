@@ -2,6 +2,8 @@
 
 namespace Kjos\Orchestra\Contexts;
 
+use Illuminate\Support\Facades\DB;
+
 class TenantContext
 {
     public string $name;
@@ -39,6 +41,13 @@ class TenantContext
         // Remplacer la config en mémoire, pas l'env du tenant courant
         foreach ($this->config as $key => $value) {
             config()->set($key, $value);
+        }
+
+        // ⚡ Reset des connexions existantes pour forcer Laravel à utiliser la nouvelle DB
+        /** @phpstan-ignore-next-line */
+        foreach (DB::getConnections() as $name => $connection) {
+        /** @phpstan-ignore-next-line */
+            DB::purge($name);
         }
     }
 }

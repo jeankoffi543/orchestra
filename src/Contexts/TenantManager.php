@@ -5,6 +5,7 @@ namespace Kjos\Orchestra\Contexts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Kjos\Orchestra\Facades\Concerns\Tenancy;
 
 class TenantManager
 {
@@ -182,6 +183,10 @@ class TenantManager
      */
     public function runFor(string $tenant, \Closure $callback): mixed
     {
+        // force host
+        $request = request();
+        $request->headers->set('host', Tenancy::getDomain($tenant));
+
         $this->switchTo($tenant);
         Log::info('config = ' . config('database.connections.pgsql.database'));
         Log::info('🎯 Callback: DB courante = ' . DB::connection()->getDatabaseName());

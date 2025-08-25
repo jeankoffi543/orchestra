@@ -155,7 +155,8 @@ class Tenancy
         // check if tenant already exists
         if (app()->runningInConsole()) {
             if (File::exists($basePath)) {
-                throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
+                File::deleteDirectory($basePath);
+                // throw new \Exception('Tenant already exists', Response::HTTP_CONFLICT);
             }
         }
 
