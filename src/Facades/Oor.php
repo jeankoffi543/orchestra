@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static void migrate(array<string, mixed> $credentials, string $name, \Kjos\Orchestra\Facades\Concerns\RollbackManager $rollback, bool $exists = true)
  * @method static void restore(string $tenantName, string $driver = 'pgsql', \Illuminate\Console\OutputStyle $console)
  * @method static array<string, string> getTenants()
- * @method static bool isMaster(string $name)
+ * @method static bool isMaster(?string $name = null, bool $force = false)
  * @method static void runFor(string $name, \Closure $callback)
  * @see \App\Providers\Facades\Orchestra
  */
